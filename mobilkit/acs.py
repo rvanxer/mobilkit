@@ -325,7 +325,7 @@ def search_field(fields, **params):
     res = fields.query(query)
     if func is not None:
         res = res.pipe(func)
-    if res.shape[0] == 1:
+    if len(res) == 1:
         return res.iloc[0]['field_id'].upper()
     return res
 

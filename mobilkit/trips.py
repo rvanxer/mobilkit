@@ -14,7 +14,7 @@ from mobilkit.geo import CRS_DEG, CRS_M
 from mobilkit.gps import UID, LAT, LON, TS, ERR
 
 
-def get_stay_point_trips(x, y, t, dist_thresh=200, time_thresh=30):
+def get_stay_point_trips(x, y, t, dist_thresh=200, time_thresh=1800):
     """
     Compute trip points based on the stay point detection algorithm in
     Sadeghinasr et al. (2019) https://doi.org/10.1061/9780784482438.002
@@ -42,7 +42,7 @@ def get_stay_point_trips(x, y, t, dist_thresh=200, time_thresh=30):
         j = i + 1
         while j < len(x):
             dist = float(hs.haversine((y[i], x[i]), (y[j], x[j]), unit='m'))
-            tdiff = (t[j] - t[i]) / 60
+            tdiff = t[j] - t[i]
             if dist > dist_thresh:
                 if tdiff > time_thresh:
                     coord = [sum(a[i:j])/(j-i) for a in [x, y]]

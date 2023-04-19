@@ -65,12 +65,15 @@ class Params:
             else:
                 raise KeyError(f'"{key}" of "{key_str}" not found in params.')
         return node
+    
+    def __getitem__(self, key_str, sep='.'):
+        return self.get(key_str, sep)
 
     def set(self, values, write=True):
         self._data = update_nested_dict(self._data, values)
         if write:
             self.write()
-            
+    
     def read(self):
         if os.path.exists(self.path):
             with open(self.path, 'r') as f:
@@ -99,6 +102,25 @@ def mkdir(path):
     assert isinstance(path, str) or isinstance(path, Path)
     Path(path).mkdir(exist_ok=True, parents=True)
     return Path(path)
+
+
+def mkfile(path):
+    """
+    Shorthand for making the base folder of the given path.
+    
+    Parameters
+    ----------
+    path : str | Path
+        Path of the file to be created.
+        
+    Returns
+    -------
+    Path
+        Same path as input but converted to PosixPath.
+    """
+    assert isinstance(path, str) or isinstance(path, Path)
+    path = Path(path)
+    return mkdir(path.parent) / path.name
 
 
 def update_nested_dict(d, u):
@@ -146,13 +168,28 @@ def dates(start: str, end: str):
     return pd.date_range(start, end).date
 
 
-def normalize(x):
+def to_date(x, fmt='%Y-%m-%d'):
+    """ Convert an input to date, esp. if in string format. """
+    if isinstance(x, date):
+        return x
+    if isinstance(x, str):
+        return datetime.strptime(x, fmt).date()
+    if type(x) in [list, tuple] and len(x) == 3:
+        return date(*x)
+    else:
+        raise TypeError('Date must be of either type `datetime.date` '
+                        f'or `str`, but supplied: {type(x)}')
+
+
+def normalize(x, vmin=None, vmax=None):
     """
     Normalize an array of values to fit in the range [0, 1].
     """
     if isinstance(x, list) or isinstance(x, tuple):
         x = np.array(x)
-    return (x - np.min(x)) / (np.max(x) - np.min(x))
+    vmin = vmin or np.min(x)
+    vmax = vmax or np.max(x)
+    return (x - vmin) / (vmax - vmin)
 
 
 def standardize(x, err=1e-10):

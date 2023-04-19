@@ -3,6 +3,7 @@ from pathlib import Path
 import warnings
 
 import pyspark
+from pyspark.sql.functions import arrays_zip
 
 import mobilkit as mk
 
@@ -41,6 +42,7 @@ class Types:
     time = _.TimestampType()
     date = _.DateType()
     str = _.StringType()
+    binary = _.BinaryType()
     # callable, composite types
     array = _.ArrayType
     map = _.MapType
@@ -103,6 +105,18 @@ def write(df, outdir, parts=None, compress=False, overwrite=True):
         df.write.parquet(outdir)
 
 
+def zip_cols(df, key_cols, col_name):
+    if isinstance(key_cols, str): key_cols = [key_cols]
+    cols = list(set(df.columns) - set(key_cols))
+    return df.select(*key_cols, arrays_zip(*cols).alias(col_name))
+
+
+# def unzip_cols(df, col_name='pts', uid=UID, x=LON, y=LAT, t=TS, e=ERR):
+#     cols = [x, y, t, e] if e in str(df.schema) else [x, y, t]
+#     if all([c in df.columns for c in cols]): return df
+#     return df.select(uid, *[F.col(col)[x].alias(x) for x in cols])
+        
+        
 class Spark:
     """
     A custom pyspark session handler to help with pyspark operations.

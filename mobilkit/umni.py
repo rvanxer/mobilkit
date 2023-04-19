@@ -41,9 +41,9 @@ SERVER = os.uname().nodename.split('.')[0]
 # Pyspark session handler with resources allocated 
 # according to the host server
 SP = mk.spark.Spark({k: v.get(SERVER, None) for k, v in {
-    'executor.memory': dict(tnet1='200g', umni2='36g', umni5='160g'),
-    'driver.memory': dict(tnet1='200g', umni2='36g', umni5='160g'),
-    'default.parallelism': dict(tnet1=16, umni2=20, umni5=32)
+    'executor.memory': dict(tnet1='200g', umni1='36g', umni2='36g', umni5='160g'),
+    'driver.memory': dict(tnet1='200g', umni1='36g', umni2='36g', umni5='160g'),
+    'default.parallelism': dict(tnet1=16, umni1=20, umni2=20, umni5=32)
 }.items()}, start=False)
 
 # Important paths

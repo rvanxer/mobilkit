@@ -89,6 +89,62 @@ OSM_CLASSES = {
                    'water_works'],
 }
 
+# FIPS codes of all the 50 US states
+# obtained from https://transition.fcc.gov/oet/info/maps/census/fips/fips.txt
+US_STATES_FIPS = {
+    'ALABAMA': 1,
+    'ALASKA': 2,
+    'ARIZONA': 4,
+    'ARKANSAS': 5,
+    'CALIFORNIA': 6,
+    'COLORADO': 8,
+    'CONNECTICUT': 9,
+    'DELAWARE': 10,
+    'DISTRICT OF COLUMBIA': 11,
+    'FLORIDA': 12,
+    'GEORGIA': 13,
+    'HAWAII': 15,
+    'IDAHO': 16,
+    'ILLINOIS': 17,
+    'INDIANA': 18,
+    'IOWA': 19,
+    'KANSAS': 20,
+    'KENTUCKY': 21,
+    'LOUISIANA': 22,
+    'MAINE': 23,
+    'MARYLAND': 24,
+    'MASSACHUSETTS': 25,
+    'MICHIGAN': 26,
+    'MINNESOTA': 27,
+    'MISSISSIPPI': 28,
+    'MISSOURI': 29,
+    'MONTANA': 30,
+    'NEBRASKA': 31,
+    'NEVADA': 32,
+    'NEW HAMPSHIRE': 33,
+    'NEW JERSEY': 34,
+    'NEW MEXICO': 35,
+    'NEW YORK': 36,
+    'NORTH CAROLINA': 37,
+    'NORTH DAKOTA': 38,
+    'OHIO': 39,
+    'OKLAHOMA': 40,
+    'OREGON': 41,
+    'PENNSYLVANIA': 42,
+    'RHODE ISLAND': 44,
+    'SOUTH CAROLINA': 45,
+    'SOUTH DAKOTA': 46,
+    'TENNESSEE': 47,
+    'TEXAS': 48,
+    'UTAH': 49,
+    'VERMONT': 50,
+    'VIRGINIA': 51,
+    'WASHINGTON': 53,
+    'WEST VIRGINIA': 54,
+    'WISCONSIN': 55,
+    'WYOMING': 56
+}
+
 
 class Bbox:
     """ A geographic rectangle that serves as a bounding box. """
@@ -310,7 +366,7 @@ def meanshift_top(x, y, bw: float, kwargs: str):
         return [np.nan, np.nan]
 
 
-def get_tiger_shp(dataset, file, fips=0, year=2021):
+def get_tiger_shp(dataset, file, fips=0, year=2021, overwrite=False):
     """
     Download the TIGER/Line shapefile of US region(s) or load it from disk.
 
@@ -319,17 +375,20 @@ def get_tiger_shp(dataset, file, fips=0, year=2021):
     dataset : str
         The label of the dataset to be downloaded. The currently supported
         product names are:
-            bg              census block groups
-            county          counties
-            csa             combined statistical areas
-            edges           ???
-            place           places of interest (?)
-            primary_roads   ???
-            roads           all roads
-            rails           all rail lines (?)
-            state           states
-            tract           census tracts
-            zcta520         zip code tabulation areas
+            ---------------------------------------------------------------
+            Layer           Description                  Available at scale
+            ---------------------------------------------------------------
+            bg              census block groups          state
+            county          counties                     nation
+            csa             combined statistical areas   nation
+            edges           ???                          county
+            place           places (???)                 county
+            primary_roads   ???                          nation
+            roads           all roads                    county
+            rails           all rail lines (?)           nation
+            state           states                       nation
+            tract           census tracts                state
+            zcta520         zip code tabulation areas    nation
     file : str
         Path of the output file. Should end in '.zip'.
     fips : int
@@ -338,13 +397,16 @@ def get_tiger_shp(dataset, file, fips=0, year=2021):
         For counties, it is at most a 5-digit number.
     year : int
         The year whose data are to be downloaded.
+    overwrite : bool
+        Whether overwrite a possibly existing output file.
 
     Returns
     -------
     df : geopandas.GeoDataFrame
         The response object of the URL's GET output.
     """
-    if os.path.exists(file):
+    file = Path(file)
+    if file.exists() and not overwrite:
         return gpd.read_file(file)
     # aliases for spatial scales at which shapefiles exist
     us, state, cnty = 'us', f'{fips:02}', f'{fips:05}'
@@ -366,7 +428,7 @@ def get_tiger_shp(dataset, file, fips=0, year=2021):
         # create the parent folder if it does not exist
         U.mkdir(Path(file).parent)
         # write as compressed shapefile
-        with open(file, 'wb') as f:
+        with open(U.mkfile(file), 'wb') as f:
             for chunk in resp.iter_content(chunk_size=512):
                 if chunk:  # filter out keep-alive new chunks
                     f.write(chunk)

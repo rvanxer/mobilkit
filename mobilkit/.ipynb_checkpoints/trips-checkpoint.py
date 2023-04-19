@@ -14,178 +14,157 @@ from mobilkit.geo import CRS_DEG, CRS_M
 from mobilkit.gps import UID, LAT, LON, TS, ERR
 
 
-def old_make_virtual_regions(df, **kwargs):
+def get_stay_point_trips(x, y, t, dist_thresh=200, time_thresh=1800):
     """
-    Get waypoint clusters from the ping data.
+    Compute trip points based on the stay point detection algorithm in
+    Sadeghinasr et al. (2019) https://doi.org/10.1061/9780784482438.002
 
     Parameters
     ----------
-    df : pyspark.sql.DataFrame
-        Pings table with at least the following columns:
-        -----------------
-        column      dtype
-        -----------------
-        user_id     int64
-        lat         float
-        lon         float
-        timestamp   int32
-    kwargs : dict
-        Keyword arguments for `mobilkit.geo.meanshift`.
+    x, y, t: list[float]
+        Trajectory (sequence of pings), with x (longitude) and y (latitude)
+        in degrees and t (time) in seconds since either the start of the day
+        or the start of the first date in a set of dates.
+    dist_thresh : float
+        Maximum distance (in meters) between any two points in a stay region.
+    time_thresh : float
+        Maximum time gap (in seconds) between any two points in a stay region.
 
     Returns
     -------
-    pyspark.sql.DataFrame
-        A table with the following schema:
-        -------------------------------
-        column      dtype   description
-        -------------------------------
-        user_id     int64   user ID
-        lon         float   longitude of the ping
-        lat         float   latitude ""
-        timestamp   int32   timestamp ""
-        label       int     serial number of the cluster
-        cluster_x   float   cluster's longitude
-        cluster_y   float   cluster's latitude
+    trips : list[list[tuple[3]]]
+        A list of trips, each of which contains a sequence of points (x, y, t).
     """
-    if 'date' not in df.columns:
-        df = df.withColumn('date', F.date_format(
-            F.from_unixtime('timestamp'), 'yyyy-MM-dd'))
-    key_cols = ['user_id', 'date', 'lon', 'lat', 'timestamp']
+    trips, cur_trip = [], []
+    trip_started = False
+    i = 0
+    while i < len(x):
+        j = i + 1
+        while j < len(x):
+            dist = float(hs.haversine((y[i], x[i]), (y[j], x[j]), unit='m'))
+            tdiff = t[j] - t[i]
+            if dist > dist_thresh:
+                if tdiff > time_thresh:
+                    coord = [sum(a[i:j])/(j-i) for a in [x, y]]
+                    if trip_started:
+                        cur_trip.append((*coord, t[i]))
+                        trips.append(cur_trip)
+                        cur_trip = []
+                        trip_started = False
+                    if not trip_started:
+                        trip_started = True
+                        cur_trip.append((*coord, t[j-1]))
+                else:
+                    if trip_started:
+                        cur_trip.append((x[j], y[j], t[j]))
+                i = j
+                break
+            j += 1
+        if j == len(x):
+            if trip_started:
+                cur_trip.append((x[j-1], y[j-1], t[j-1]))
+            break
+    return trips
 
-    def udf(df: pd.DataFrame) -> pd.DataFrame:
-        """ User-defined function (UDF) to get the location of trajectory
-        cluster center for one user-day. """
-        """ UDF to get the locations of trajectory cluster centers. """
-        centers, labels = mk.geo.meanshift(df[['lon', 'lat']], **kwargs)
-        if centers is not None:
-            df = df[key_cols].reset_index()
-            df['label'] = labels
-            df[['cluster_x', 'cluster_y']] = centers
-        else:
-            return pd.DataFrame([], columns=[key_cols + [
-                'label', 'cluster_x', 'cluster_y']])
 
-    # do the clustering
-    schema = mk.spark.schema(dict(
-        user_id=T.int64, date=T.date, lon=T.float, lat=T.float,
-        timestamp=T.int64, label=T.int, cluster_x=T.float, cluster_y=T.float))
-    return df.groupby('user_id', 'date').applyInPandas(udf, schema=schema)
-
-
-def old_get_trip_points(df, min_dwell):
+def segment_trips_clustering(row, min_dwell, radius, **ms_kwargs):
     """
-    Get trip points (pings) from ping cluster locations.
+    Segment trips from a given daily trajectory. This is done by first creating
+    virtual cluster regions based on (x, y) coords that are later split by time.
+    The clusters are labeled as 'stay' or 'enroute' depending on their dwell
+    time. The pings between each pair of consecutive stay regions are grouped
+    and categorized as one trip.
 
     Parameters
     ----------
-    df : pyspark.sql.DataFrame
-        Output of `mobilkit.trips.make_virtual_regions` with the following
-        schema:
-        -----------------
-        column      dtype
-        -----------------
-        user_id     int64
-        lat         float
-        lon         float
-        timestamp   int32
-        label       int
-        cluster_x   float
-        cluster_y   float
+    row : pandas.Series
+        A dataframe row with at least the following columns:
+        ---------------------------------------
+        column  dtype       description
+        ---------------------------------------
+        $UID    int64       unique user ID
+        $LON    [float]     longitudes of the pings
+        $LAT    [float]     latitudes of the pings
+        $TS     [float]     seconds between ping time & start of the day
     min_dwell : float
-        Minimum time between two pings needed to classify the time difference
-        as "staying" at the same place. Its unit is the same as that of the
-        timestamp (usually seconds).
+        Minimum time between two pings (seconds) needed to classify the time
+        difference as "staying" at the same place.
+    radius : float
+        Kernel radius for MeanShift clustering (meters). This value is converted
+        to degrees using `mobilkit.geo.dist_m2deg` based on a trajectory's mean
+        latitude.
+    ms_kwargs : dict
+        Other parameters passed to the MeanShift algorithm.
 
     Returns
     -------
-    pyspark.sql.DataFrame
-        A table whose each row details one trip (within one day).
-        ---------------------------------------
-        column      dtype           description
-        ---------------------------------------
-        user_id     int64           user ID
-        date        date            date (derived from timestamp)
-        trip_id     int16           trip serial number per user-day
-        lon         array[float]    longitudes of the trip points
-        lat         array[float]    latitudes ""
-        time        array[int32]    timestamps ""
-        n_pts       int16           number of trip points
+    trips : list[dict[str, int | float]]
+        List of trips for the input user-day, each item being a dict of:
+        $UID                int     input user ID
+        trip_num            int     trip number for this user
+        $LON, $LAT, $TS     [float] coordinates & timestamp of each point
     """
-
-    def udf(df):
-        """ Extract pings associated for each trip based on the ping cluster
-        data. """
-        # create an empty dataframe with required schema in case of errors
-        empty_df = pd.DataFrame([], columns=[
-            'user_id', 'date', 'trip_id', 'lon', 'lat', 'time', 'n_pts'])
-        # sort the pings by time
-        df = df.rename(columns={'timestamp': 'time'}).sort_values('time')
-        # redefine the clusters to make sure that temporally distant but
-        # spatially close points are recognized as different clusters
-        df['clust_id'] = (df['label'].diff() != 0).astype('int').cumsum()
-        # get earliest & latest ping time of each redefined cluster
-        clust = df.groupby('clust_id')['time'].agg(['first', 'last'])
-        # label the regions as stay or enroute based on their stay duration (
-        # unit: s)
-        clust['is_enroute'] = clust['last'] - clust['first'] < min_dwell
-        # join the cluster labels to the ping table
-        df = df.merge(clust['is_enroute'], on='clust_id')
-        # collect ping points (x, y, time) for each cluster (row) in lists
-        clust = df.groupby(['clust_id', 'is_enroute']).agg({
-            x: list for x in ['lon', 'lat', 'time']}).reset_index()
-        # set same cluster IDs for consecutive enroute regions
-        clust['region_id'] = ((clust['clust_id'] * (
-                1 - clust['is_enroute'].astype(int)))
-                              .diff() != 0).astype(int).cumsum()
-        # collect (combine) the points of consecutive enroute regions
-        clust = clust.groupby(['region_id', 'is_enroute'])[
-            ['lon', 'lat', 'time']].sum().reset_index()
-        clust.insert(0, 'user_id', df['user_id'].iloc[0])
-        # identify trips & their ping coordinates from the stay/enroute
-        # region data using the logic used in the Maputo report (p.47)
-        trip_started = True
-        # initialize arrays for trip points (x, y, t) & trip records
-        X, Y, T = [], [], []
-        trips = []
-        # for each virtual region (row)
-        for _, r in clust.iterrows():
-            # if this region is enroute
-            if r['is_enroute']:
-                if not trip_started:
-                    # add all points of the enroute region to the trip
-                    X += r.lon
-                    Y += r.lat
-                    T += r.time
-            else:  # if this is a stay region
-                if trip_started:  # if region's last point starts a new trip
-                    trip_started = bool(r['is_enroute'])
-                    # add the last point of this region to the trip
-                    X += [r.lon[-1]]
-                    Y += [r.lat[-1]]
-                    T += [r.time[-1]]
-                else:  # if this region's first point ends the current trip
-                    X += [r.lon[0]]
-                    Y += [r.lat[0]]
-                    T += [r.time[0]]
-                    # collect the points for this trip
-                    trips.append({'user_id': df['user_id'].iloc[0],
-                                  'date': df['date'].iloc[0], 'lon': X,
-                                  'lat': Y, 'time': T, 'n_pts': len(X)})
-                    # create a new trip starting with this region's last point
-                    X = [r.lon[-1]]
-                    Y = [r.lat[-1]]
-                    T = [r.time[-1]]
-        if len(trips) == 0:
-            return empty_df
-        trips = pd.DataFrame(trips).reset_index(drop=True)
-        trips.insert(2, 'trip_id', trips.index)
-        return trips
-
-    # compute the trip points
-    schema = mk.spark.schema(dict(
-        user_id=T.int64, date=T.date, trip_id=T.int16, lon=T.array(T.float),
-        lat=T.array(T.float), time=T.array(T.int32), n_pts=T.int16))
-    return df.groupby('user_id', 'date').applyInPandas(udf, schema=schema)
+    # convert the trajectory's coordinates to long format and sort by time
+    df = pd.DataFrame(row[[LON, LAT, TS]].to_dict()).sort_values(TS)
+    # compute kernel bandwidth in degrees from the kernel radius
+    bandwidth = mk.geo.dist_m2deg(radius, df[LAT].mean())
+    try:
+        # create and fit a MeanShift model with the (x, y) coordinate data
+        model = MeanShift(bandwidth=bandwidth, **ms_kwargs)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            model.fit(df[[LON, LAT]])
+            # extract the cluster labels and centers
+            df['label'] = model.labels_
+            df[['cx', 'cy']] = model.cluster_centers_[df['label']]
+    except ValueError:
+        # in case of any error, return an empty table with the expected schema
+        return pd.DataFrame([], columns=['trip_num', UID, LON, LAT, TS])
+    # redefine the clusters to make sure that temporally distant but
+    # spatially close points are recognized as different clusters
+    df['cid'] = (df['label'].diff() != 0).astype('int').cumsum()
+    # get earliest & latest ping time of each redefined cluster
+    C = df.groupby('cid')[TS].agg(['first', 'last'])
+    # label the regions as stay/enroute based on their stay duration (seconds)
+    C['enroute'] = C['last'] - C['first'] < min_dwell
+    # join the cluster labels to the ping table
+    df = df.merge(C['enroute'], on='cid')
+    # collect ping points (x, y, t) for each cluster (row) in lists
+    df['xyt'] = list(zip(df[LON], df[LAT], df[TS]))
+    C = df.groupby(['cid', 'enroute'])['xyt'].agg(list).reset_index()
+    # set same cluster IDs for consecutive enroute regions
+    C['rgn_id'] = (((C['cid'] * (1 - C['enroute'].astype(int))).diff() != 0)
+                   .astype(int).cumsum())
+    # collect (combine) the points of consecutive enroute regions
+    C = C.groupby(['rgn_id', 'enroute'])['xyt'].sum().reset_index()
+    # identify trips & their ping coordinates from the stay/enroute
+    # region data using the logic used in the Maputo report (p.47)
+    trip_started = True
+    trip_num = 0
+    X, trips = [], []
+    # for each virtual region (row)
+    for enroute, xyt in zip(C['enroute'], C['xyt']):
+        if enroute:  # if this is a non-stay (enroute) region
+            if not trip_started:
+                # add all points of the enroute region to the trip
+                X += xyt
+        else:  # if this is a stay region
+            # if region's last point starts a new trip
+            if trip_started:
+                trip_started = enroute
+                # add the last point of this region to the trip
+                X.append(xyt[-1])
+            else:  # if this region's first point ends the current trip
+                # add the first point of this region to the trip
+                X.append(xyt[0])
+                # collect the points for this trip
+                trips.append({UID: row[UID], 'trip_num': trip_num} |
+                             dict(zip([LON, LAT, TS], list(zip(*X)))))
+                # create a new trip starting with this region's last point
+                trip_num += 1
+                X = [xyt[-1]]
+    # return the segmented trips for this user-day
+    return trips
 
 
 def old_get_trip_summary(df, morn_peak_hrs, eve_peak_hrs):
@@ -557,99 +536,3 @@ def snap_trips(df, geom, snap_tol):
     df = df2.merge(df, left_index=True, right_on='tr_id').drop(columns='tr_id')
     return df
 
-
-def udf_segment_trips(row, min_dwell, radius, **ms_kwargs):
-    """
-    Segment trips from a given daily trajectory. This is done by first creating
-    virtual cluster regions based on (x, y) coords that are later split by time.
-    The clusters are labeled as 'stay' or 'enroute' depending on their dwell
-    time. The pings between each pair of consecutive stay regions are grouped
-    and categorized as one trip.
-
-    Parameters
-    ----------
-    row : pandas.Series
-        A dataframe row with at least the following columns:
-        ---------------------------------------
-        column  dtype       description
-        ---------------------------------------
-        $UID    int64       unique user ID
-        $LON    [float]     longitudes of the pings
-        $LAT    [float]     latitudes of the pings
-        $TS     [float]     seconds between ping time & start of the day
-    min_dwell : float
-        Minimum time between two pings (seconds) needed to classify the time
-        difference as "staying" at the same place.
-    radius : float
-        Kernel radius for MeanShift clustering (meters). This value is converted
-        to degrees using `mobilkit.geo.dist_m2deg` based on a trajectory's mean
-        latitude.
-    ms_kwargs : dict
-        Other parameters passed to the MeanShift algorithm.
-
-    Returns
-    -------
-
-    """
-    # convert the trajectory's coordinates to long format and sort by time
-    df = pd.DataFrame(row[[LON, LAT, TS]].to_dict()).sort_values(TS)
-    # compute kernel bandwidth in degrees from the kernel radius
-    bandwidth = mk.geo.dist_m2deg(radius, df[LAT].mean())
-    try:
-        # create and fit a MeanShift model with the (x, y) coordinate data
-        model = MeanShift(bandwidth=bandwidth, **ms_kwargs)
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore')
-            model.fit(df[[LON, LAT]])
-            # extract the cluster labels and centers
-            df['label'] = model.labels_
-            df[['cx', 'cy']] = model.cluster_centers_[df['label']]
-    except ValueError:
-        # in case of any error, return an empty table with the expected schema
-        return pd.DataFrame([], columns=['trip_num', UID, LON, LAT, TS])
-    # redefine the clusters to make sure that temporally distant but
-    # spatially close points are recognized as different clusters
-    df['cid'] = (df['label'].diff() != 0).astype('int').cumsum()
-    # get earliest & latest ping time of each redefined cluster
-    C = df.groupby('cid')[TS].agg(['first', 'last'])
-    # label the regions as stay/enroute based on their stay duration (seconds)
-    C['enroute'] = C['last'] - C['first'] < min_dwell
-    # join the cluster labels to the ping table
-    df = df.merge(C['enroute'], on='cid')
-    # collect ping points (x, y, t) for each cluster (row) in lists
-    df['xyt'] = list(zip(df[LON], df[LAT], df[TS]))
-    C = df.groupby(['cid', 'enroute'])['xyt'].agg(list).reset_index()
-    # set same cluster IDs for consecutive enroute regions
-    C['rgn_id'] = (((C['cid'] * (1 - C['enroute'].astype(int))).diff() != 0)
-                   .astype(int).cumsum())
-    # collect (combine) the points of consecutive enroute regions
-    C = C.groupby(['rgn_id', 'enroute'])['xyt'].sum().reset_index()
-    # identify trips & their ping coordinates from the stay/enroute
-    # region data using the logic used in the Maputo report (p.47)
-    trip_started = True
-    trip_num = 0
-    X, trips = [], []
-    # for each virtual region (row)
-    for enroute, xyt in zip(C['enroute'], C['xyt']):
-        if enroute:  # if this is a non-stay (enroute) region
-            if not trip_started:
-                # add all points of the enroute region to the trip
-                X += xyt
-        else:  # if this is a stay region
-            # if region's last point starts a new trip
-            if trip_started:
-                trip_started = enroute
-                # add the last point of this region to the trip
-                X.append(xyt[-1])
-            else:  # if this region's first point ends the current trip
-                # add the first point of this region to the trip
-                X.append(xyt[0])
-                # collect the points for this trip
-                trips.append({UID: row[UID], 'trip_num': trip_num} |
-                             dict(zip([LON, LAT, TS], list(zip(*X)))))
-                # create a new trip starting with this region's last point
-                trip_num += 1
-                X = [xyt[-1]]
-    # return the segmented trips for this user-day
-    return trips
-    # return pd.DataFrame(trips).rename_axis('trip_num').reset_index()

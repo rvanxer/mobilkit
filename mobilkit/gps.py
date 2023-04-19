@@ -164,18 +164,6 @@ def get_user_pings(sp, date, inroot, outroot=None, tz='UTC',
     return df
 
 
-def zip_pings(df, col='pings', uid=UID, x=LON, y=LAT, t=TS, e=ERR):
-    if col in df.columns: return df
-    cols = [x, y, t, e] if e in df.columns else [x, y, t]
-    return df.select(uid, F.arrays_zip(*cols).alias(col))
-
-
-def unzip_pings(df, col='pings', uid=UID, x=LON, y=LAT, t=TS, e=ERR):
-    cols = [x, y, t, e] if e in str(df.schema) else [x, y, t]
-    if all([c in df.columns for c in cols]): return df
-    return df.select(uid, *[F.col(col)[x].alias(x) for x in cols])
-
-
 def filter_bbox_long(df, left, bottom, right, top, xcol=LON, ycol=LAT):
     return df.filter(f'{left} <= {xcol} and {xcol} <= {right} and ' +
                      f'{bottom} <= {ycol} and {ycol} <= {top}')
@@ -219,6 +207,27 @@ def get_accel_zipped(df, speed='speed', tdiff='tdiff', accel='accel',
         return [0.] + [float((v[i+1] - v[i]) / (t[i+1] + zero_div_tol))
                        for i in range(1, len(v) - 1)]
     return df.withColumn(accel, F.udf(udf, T.array(dtype))(speed, tdiff))
+
+
+def get_motion_metrics(df, zero_tol=1e-6, dist='dist', tdiff='tdiff', 
+                       speed='speed', accel='accel', lon=LON, lat=LAT, ts=TS):
+    """
+    """
+    df = df.filter(F.size(lon) > 2)
+    def get_dist(x, y):
+        src, trg = list(zip(y[:-1], x[:-1])), list(zip(y[1:], x[1:]))
+        return [0.] + haversine(src, trg, unit='m').tolist()
+    def get_tdiff(t):
+        return [0.] + np.diff(t).astype(float).tolist()
+    def get_speed(d, t):
+        return (np.array(d) / (np.array(t) + zero_tol)).tolist()
+    def get_accel(v, t):
+        return [0., 0.] + (np.diff(v[1:]) / (np.array(t[2:]) + zero_tol)).tolist()
+    df = df.withColumn(dist, F.udf(get_dist, T.array(T.float))(lon, lat))
+    df = df.withColumn(tdiff, F.udf(get_tdiff, T.array(T.float))(ts))
+    df = df.withColumn(speed, F.udf(get_speed, T.array(T.float))(dist, tdiff))
+    df = df.withColumn(accel, F.udf(get_accel, T.array(T.float))(speed, tdiff))
+    return df
 
 
 # def filter_user_pings_bbox(df, bbox, uid=UID, x=LON, y=LAT, t=TS, xyt='xyt',
