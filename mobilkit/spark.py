@@ -107,7 +107,7 @@ def write(df, outdir, parts=None, compress=False, overwrite=True):
 
 def zip_cols(df, key_cols, col_name):
     if isinstance(key_cols, str): key_cols = [key_cols]
-    cols = list(set(df.columns) - set(key_cols))
+    cols = [x for x in df.columns if not x in key_cols]
     return df.select(*key_cols, arrays_zip(*cols).alias(col_name))
 
 

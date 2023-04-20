@@ -17,9 +17,6 @@ import requests
 from scipy.spatial import cKDTree
 from sklearn.cluster import MeanShift
 
-from mobilkit import utils as U
-from mobilkit.spark import Types as T
-
 # Global coordinate reference systems (CRS) for uniformity (chosen arbitrarily).
 # spatial CRS with coordintates in meters
 CRS_M = 'EPSG:3857'
@@ -29,28 +26,28 @@ CRS_DEG = 'EPSG:4326'
 # Schema of SafeGraph places
 # Description on https://docs.safegraph.com/docs/places#places-schema
 SG_POIS_SCHEMA = {
-    'placekey': T.str,
-    'parent_placekey': T.str,
-    'location_name': T.str,
-    'safegraph_brand_ids': T.str,
-    'brands': T.str,
-    'top_category': T.str,
-    'sub_category': T.str,
-    'naics_code': T.int32,
-    'latitude': T.float,
-    'longitude': T.float,
-    'street_address': T.str,
-    'city': T.str,
-    'region': T.str,
-    'postal_code': T.int32,
-    'iso_country_code': T.str,
-    'phone_number': T.str,
-    'open_hours': T.str,
-    'category_tags': T.str,
-    'opened_on': T.str,
-    'closed_on': T.str,
-    'tracking_closed_since': T.str,
-    'geometry_type': T.str
+    'placekey': 'str',
+    'parent_placekey': 'str',
+    'location_name': 'str',
+    'safegraph_brand_ids': 'str',
+    'brands': 'str',
+    'top_category': 'str',
+    'sub_category': 'str',
+    'naics_code': 'int32',
+    'latitude': 'float',
+    'longitude': 'float',
+    'street_address': 'str',
+    'city': 'str',
+    'region': 'str',
+    'postal_code': 'int32',
+    'iso_country_code': 'str',
+    'phone_number': 'str',
+    'open_hours': 'str',
+    'category_tags': 'str',
+    'opened_on': 'str',
+    'closed_on': 'str',
+    'tracking_closed_since': 'str',
+    'geometry_type': 'str'
 }
 
 # Some important industry categories and their NAICS codes (defined arbitrarily)
@@ -301,7 +298,7 @@ def intersect_polygon_area_map(src, trg):
     src = src.to_crs(CRS_M)[['geometry']].rename_axis('src_fid').reset_index()
     trg = trg.to_crs(CRS_M)[['geometry']].rename_axis('trg_fid').reset_index()
     res = gpd.overlay(src, trg, how='intersection', keep_geom_type=False)
-    res['area'] = res.pop('geometry').area * U.SQM2SQMI
+    res['area'] = res.pop('geometry').area / 2.59e6
     return res.pivot('src_fid', 'trg_fid', 'area').fillna(0)
 
 
@@ -426,9 +423,9 @@ def get_tiger_shp(dataset, file, fips=0, year=2021, overwrite=False):
         if resp.url == 'https://www.census.gov/404.html':
             return 'Error 404 not found: ' + resp.url
         # create the parent folder if it does not exist
-        U.mkdir(Path(file).parent)
+        Path(file).parent.mkdir(exist_ok=True, parents=True)
         # write as compressed shapefile
-        with open(U.mkfile(file), 'wb') as f:
+        with open(file, 'wb') as f:
             for chunk in resp.iter_content(chunk_size=512):
                 if chunk:  # filter out keep-alive new chunks
                     f.write(chunk)
@@ -508,12 +505,14 @@ def download_osm_db_shp(state=None, country='US', continent='North America',
     geos = [continent, country, state] if state else [continent, country]
     geos = '/'.join([x.lower().replace(' ', '-') for x in geos])
     url = f'{domain}/{geos}-latest-free.shp.zip'
-    out_path = U.mkdir(outdir) + '/osm.zip'
-    fpath, headers = urllib.request.urlretrieve(url, out_path)
+    outdir = Path(outdir).mkdir(exist_ok=True, parents=True)
+    out_path = outdir / 'osm.zip'
+    fpath, headers = urllib.request.urlretrieve(url, str(out_path))
     if os.path.exists(fpath) and decompress:
         shutil.unpack_archive(fpath, outdir)
         for f in glob(outdir + '/gis_osm_*'):
             fname = f.split('/')[-1].replace('gis_osm_', '')
             layer = fname.split('_')[0]
-            shutil.move(f, U.mkdir(Path(outdir) / layer) / fname)
+            dir_ = (outdir / layer).mkdir(exist_ok=True)
+            shutil.move(f, dir_ / fname)
     return fpath, headers
