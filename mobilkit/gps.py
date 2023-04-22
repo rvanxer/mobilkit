@@ -1,4 +1,5 @@
 import datetime as dt
+from functools import reduce
 import os
 from pathlib import Path
 import warnings
@@ -7,6 +8,7 @@ from haversine import haversine_vector as haversine
 import numpy as np
 import pandas as pd
 from pyspark.sql import functions as F
+from pyspark.sql import DataFrame as Sdf
 import pytz
 from sklearn.cluster import MeanShift
 
@@ -227,6 +229,25 @@ def get_motion_metrics(df, zero_tol=1e-6, dist='dist', tdiff='tdiff',
     df = df.withColumn(tdiff, F.udf(get_tdiff, T.array(T.float))(ts))
     df = df.withColumn(speed, F.udf(get_speed, T.array(T.float))(dist, tdiff))
     df = df.withColumn(accel, F.udf(get_accel, T.array(T.float))(speed, tdiff))
+    return df
+
+
+def collect_days_data(sp, root, dates, fmt='%Y-%m-%d'):
+    """
+    Collect multiple days' user-ping data into one list by addting 
+    the number of seconds of each day to the timestamp.
+    """
+    df = []
+    dates = sorted([U.to_date(d) for d in dates])
+    for date in dates:
+        d = sp.read_parquet(root / date.strftime(fmt))
+        nDays = (date - dates[0]).days
+        def add_day(t): return [t + nDays * 86400 for t in t]
+        d = d.withColumn(TS, F.udf(add_day, T.array(T.float))(TS))
+        df.append(d)
+    df = reduce(Sdf.union, df)
+    df = df.groupby(UID).agg(*[F.flatten(F.collect_list(x)).alias(x) 
+                               for x in [LON, LAT, TS]])
     return df
 
 
