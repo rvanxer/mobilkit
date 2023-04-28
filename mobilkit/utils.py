@@ -73,6 +73,9 @@ class Params:
         self._data = update_nested_dict(self._data, values)
         if write:
             self.write()
+            
+    def __setitem__(self, values, write=True):
+        self.set(values, write)
     
     def read(self):
         if os.path.exists(self.path):
@@ -148,6 +151,15 @@ def ignore_warnings(func):
             result = func(*args, **kwargs)
         return result
     return wrapper
+
+
+def load_yaml(path):
+    """
+    Load the contents of a YAML file.
+    """
+    with open(path, 'rb') as f:
+        content = yaml.safe_load(f)
+    return content
 
 
 def log(msg):

@@ -238,7 +238,7 @@ def collect_days_data(sp, root, dates, fmt='%Y-%m-%d'):
     the number of seconds of each day to the timestamp.
     """
     df = []
-    dates = sorted([U.to_date(d) for d in dates])
+    dates = sorted(dates)
     for date in dates:
         d = sp.read_parquet(root / date.strftime(fmt))
         nDays = (date - dates[0]).days
