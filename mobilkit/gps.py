@@ -1,16 +1,18 @@
-import datetime as dt
-from functools import reduce
-import os
-from pathlib import Path
-import warnings
+from __init__ import *
 
-from haversine import haversine_vector as haversine
-import numpy as np
-import pandas as pd
-from pyspark.sql import functions as F
-from pyspark.sql import DataFrame as Sdf
-import pytz
-from sklearn.cluster import MeanShift
+# import datetime as dt
+# from functools import reduce
+# import os
+# from pathlib import Path
+# import warnings
+
+# from haversine import haversine_vector as haversine
+# import numpy as np
+# import pandas as pd
+# from pyspark.sql import functions as F
+# from pyspark.sql import DataFrame as Sdf
+# import pytz
+# from sklearn.cluster import MeanShift
 
 from mobilkit.spark import Types as T
 from mobilkit.spark import write
@@ -189,7 +191,7 @@ def get_dist_zipped(df, x=LON, y=LAT, dist='dist', unit='m', dtype=T.float):
     def udf(x, y):
         try:
             src, trg = list(zip(y[:-1], x[:-1])), list(zip(y[1:], x[1:]))
-            return [0.] + haversine(src, trg, unit=unit).tolist()
+            return [0.] + hs.haversine_vector(src, trg, unit=unit).tolist()
         except Exception:
             return []
     df = df.withColumn(dist, F.udf(udf, T.array(dtype))(x, y))
@@ -218,7 +220,7 @@ def get_motion_metrics(df, zero_tol=1e-6, dist='dist', tdiff='tdiff',
     df = df.filter(F.size(lon) > 2)
     def get_dist(x, y):
         src, trg = list(zip(y[:-1], x[:-1])), list(zip(y[1:], x[1:]))
-        return [0.] + haversine(src, trg, unit='m').tolist()
+        return [0.] + hs.haversine_vector(src, trg, unit='m').tolist()
     def get_tdiff(t):
         return [0.] + np.diff(t).astype(float).tolist()
     def get_speed(d, t):
@@ -245,7 +247,7 @@ def collect_days_data(sp, root, dates, fmt='%Y-%m-%d'):
         def add_day(t): return [t + nDays * 86400 for t in t]
         d = d.withColumn(TS, F.udf(add_day, T.array(T.float))(TS))
         df.append(d)
-    df = reduce(Sdf.union, df)
+    df = reduce(pyspark.sql.DataFrame.union, df)
     df = df.groupby(UID).agg(*[F.flatten(F.collect_list(x)).alias(x) 
                                for x in [LON, LAT, TS]])
     return df

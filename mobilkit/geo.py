@@ -1,21 +1,23 @@
-from glob import glob
-import itertools
-import json
-from operator import itemgetter
-import os
-from pathlib import Path
-import shutil
-import urllib
-import warnings
+from __init__ import *
 
-import geopandas as gpd
-from geopandas import GeoDataFrame as Gdf
-from haversine import haversine_vector
-import numpy as np
-import pandas as pd
-import requests
-from scipy.spatial import cKDTree
-from sklearn.cluster import MeanShift
+# from glob import glob
+# import itertools
+# import json
+# from operator import itemgetter
+# import os
+# from pathlib import Path
+# import shutil
+# import urllib
+# import warnings
+
+# import geopandas as gpd
+# from geopandas import GeoDataFrame as Gdf
+# from haversine import haversine_vector
+# import numpy as np
+# import pandas as pd
+# import requests
+# from scipy.spatial import cKDTree
+# from sklearn.cluster import MeanShift
 
 # Global coordinate reference systems (CRS) for uniformity (chosen arbitrarily).
 # spatial CRS with coordintates in meters
@@ -191,7 +193,8 @@ def pdf2gdf(df, x='lon', y='lat', crs=None):
     gpd.GeoDataFrame
         Converted GDF.
     """
-    return Gdf(df, geometry=gpd.points_from_xy(df[x], df[y], crs=crs))
+    geom = gpd.points_from_xy(df[x], df[y], crs=crs)
+    return gpd.GeoDataFrame(df, geometry=geom)
 
 
 def gdf2pdf(df, x='lon', y='lat', crs=None):
@@ -272,7 +275,7 @@ def get_dist(x0, y0, x1, y1, df=None, haversine=True, unit='m'):
     if isinstance(x0, str):
         x0, y0, x1, y1 = df[x0], df[y0], df[x1], df[y1]
     if haversine:
-        return haversine_vector(list(zip(y0, x0)), list(zip(y1, x1)), unit=unit)
+        return hs.haversine_vector(list(zip(y0, x0)), list(zip(y1, x1)), unit=unit)
     else:
         p0 = np.vstack([np.array(x0), np.array(y0)]).T
         p1 = np.vstack([np.array(x1), np.array(y1)]).T
@@ -342,8 +345,9 @@ def meanshift(data, bandwidth=None, bin_seeding=True, include_orphans=True):
         each sample. Shape: (`num_samples`).
     """
     try:
-        model = MeanShift(bandwidth=bandwidth, bin_seeding=bin_seeding,
-                          cluster_all=include_orphans)
+        model = sklearn.cluster.MeanShift(
+            bandwidth=bandwidth, bin_seeding=bin_seeding, 
+            cluster_all=include_orphans)
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
             model.fit(data)
@@ -354,7 +358,7 @@ def meanshift(data, bandwidth=None, bin_seeding=True, include_orphans=True):
 
 def meanshift_top(x, y, bw: float, kwargs: str):
     try:
-        model = MeanShift(bandwidth=bw, **json.loads(kwargs))
+        model = sklearn.cluster.MeanShift(bandwidth=bw, **json.loads(kwargs))
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
             model.fit(np.vstack([x, y]).T)
@@ -459,10 +463,10 @@ def nearest_point(pts, df, df_cols=[]):
     A = np.concatenate(
         [np.array(geom.coords) for geom in pts.geometry.to_list()])
     B = [np.array(geom.coords) for geom in df.geometry.to_list()]
-    B_ix = tuple(itertools.chain.from_iterable(
-        [itertools.repeat(i, x) for i, x in enumerate(list(map(len, B)))]))
+    B_ix = tuple(it.chain.from_iterable(
+        [it.repeat(i, x) for i, x in enumerate(list(map(len, B)))]))
     B = np.concatenate(B)
-    ckd_tree = cKDTree(B)
+    ckd_tree = scipy.spatial.cKDTree(B)
     dist, idx = ckd_tree.query(A, k=1)
     idx = itemgetter(*idx)(B_ix)
     gdf = pd.concat(

@@ -1,11 +1,13 @@
-import os, shutil
-from pathlib import Path
-import warnings
+from __init__ import *
 
-import pyspark
-from pyspark.sql.functions import arrays_zip
+# import os, shutil
+# from pathlib import Path
+# import warnings
 
-import mobilkit as mk
+# import pyspark
+# from pyspark.sql.functions import arrays_zip
+
+# import mobilkit as mk
 
 # Default configuration of the pyspark session. This dictionary is overwritten
 # by the configuration parameters in the `project.yaml` file under the variable
@@ -97,7 +99,7 @@ def write(df, outdir, parts=None, compress=False, overwrite=True):
         shutil.rmtree(outdir)
     if isinstance(parts, int):
         df = df.repartition(parts)
-    outdir = str(mk.utils.mkdir(outdir.parent) / outdir.stem)
+    outdir = str(utils.mkdir(outdir.parent) / outdir.stem)
     if compress:
         (df.write.option('compression', 'none').mode('overwrite')
          .option('compression', 'snappy').save(outdir))
@@ -108,7 +110,8 @@ def write(df, outdir, parts=None, compress=False, overwrite=True):
 def zip_cols(df, key_cols, col_name):
     if isinstance(key_cols, str): key_cols = [key_cols]
     cols = [x for x in df.columns if not x in key_cols]
-    return df.select(*key_cols, arrays_zip(*cols).alias(col_name))
+    zipper = pyspark.sql.functions.arrays_zip
+    return df.select(*key_cols, zipper(*cols).alias(col_name))
 
 
 # def unzip_cols(df, col_name='pts', uid=UID, x=LON, y=LAT, t=TS, e=ERR):

@@ -11,7 +11,7 @@ from sklearn.cluster import MeanShift
 import mobilkit as mk
 from mobilkit.spark import Types as T
 from mobilkit.geo import CRS_DEG, CRS_M
-from mobilkit.gps import UID, LAT, LON, TS, ERR
+from mobilkit.gps import UID, LAT, LON, TS
 
 
 def get_stay_point_trips(x, y, t, dist_thresh=200, time_thresh=1800):
@@ -137,8 +137,8 @@ def segment_trips_clustering(row, min_dwell, radius, **ms_kwargs):
                    .astype(int).cumsum())
     # collect (combine) the points of consecutive enroute regions
     C = C.groupby(['rgn_id', 'enroute'])['xyt'].sum().reset_index()
-    # identify trips & their ping coordinates from the stay/enroute
-    # region data using the logic used in the Maputo report (p.47)
+    # identify trips & their ping coordinates from the stay/enroute region 
+    # data using the logic used in the Maputo report (p.47)
     trip_started = True
     trip_num = 0
     X, trips = [], []

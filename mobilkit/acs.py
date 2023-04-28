@@ -1,12 +1,14 @@
 """
 Only applicable for US Census and American Community Survey (ACS) analysis.
 """
-from itertools import zip_longest
-import re
-import requests
+from __init__ import *
 
-import pandas as pd
-from pandas import DataFrame as Pdf
+# from itertools import zip_longest
+# import re
+# import requests
+
+# import pandas as pd
+# from pandas import DataFrame as pd.DataFrame
 
 # base URL for the census data API
 ROOT_URL = 'https://api.census.gov/data'
@@ -14,7 +16,7 @@ ROOT_URL = 'https://api.census.gov/data'
 # Census table types, obtained from
 # https://www.census.gov/programs-surveys/acs/data/data-tables/table-ids
 # -explained.html
-TABLE_TYPES = Pdf([  # columns: (type id, label, description)
+TABLE_TYPES = pd.DataFrame([  # columns: (type id, label, description)
     ('B', 'Detailed Tables - Base Table',
      'Most detailed estimates on all topics for all geographies'),
     ('C', 'Collapsed Table',
@@ -216,7 +218,7 @@ def get_fields(year, src, table_type='detail'):
     resp = requests.get(url)
     if resp.status_code == 200:
         vars_ = list(resp.json()['variables'].items())
-        fields = Pdf(dict(vars_[3:])).T.rename_axis('id').reset_index()
+        fields = pd.DataFrame(dict(vars_[3:])).T.rename_axis('id').reset_index()
         return fields
     elif resp.status_code == 404:
         raise ValueError('Error 404: ' + url)
@@ -260,7 +262,7 @@ def process_fields(orig_fields):
         .query('label != "Geography"')
         .assign(label=lambda df: [x.replace('!!', '__').replace(':', '')
                                   for x in df['label']]))
-    expanded = (Pdf(list(zip(*zip_longest(
+    expanded = (pd.DataFrame(list(zip(*it.zip_longest(
         *fields['label'].apply(lambda x: x.split('__')).tolist(), fillvalue=''
     ))), index=fields['id']).rename(columns=lambda x: f'L{x}').reset_index())
     fields = (fields.merge(expanded, on='id').sort_values('id')
@@ -370,7 +372,7 @@ def download(geo, fields, src='acs5', year=2020, table_type='detail', key=None):
     in_ = '&in=' + '+'.join(':'.join(x) for x in geo_)
     key = f'&key={key}' if isinstance(key, str) else ''
     chunksize = 49
-    res = Pdf()
+    res = pd.DataFrame()
     for i in range(0, len(fields), chunksize):
         cols = fields[i : (i+chunksize)]
         get = 'get=' + ','.join(cols)
@@ -378,7 +380,7 @@ def download(geo, fields, src='acs5', year=2020, table_type='detail', key=None):
         resp = requests.get(url)
         try:
             data = resp.json()
-            df = Pdf(data[1:], columns=data[0])
+            df = pd.DataFrame(data[1:], columns=data[0])
             id_cols = list(set(df.columns) - set(cols))
             res = pd.concat([res, df.set_index(id_cols)], axis=1)
         except Exception as e:
