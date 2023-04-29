@@ -23,13 +23,7 @@ import pyspark
 from pyspark.sql import functions as F
 from pyspark.sql import DataFrame as Sdf
 import seaborn as sns
-
-# from numpy import array as Arr
-# from geopandas import GeoDataFrame as Gdf
-# from pandas import DataFrame as Pdf
-# from pandas import Series as Seq
-# from pyspark.sql import DataFrame as Sdf
-# from tqdm.notebook import tqdm
+from tqdm.notebook import tqdm
 
 # Imports from mobilkit
 import mobilkit as mk

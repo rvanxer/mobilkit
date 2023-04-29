@@ -3,10 +3,6 @@ Miscellaneous utility functions for file handling, plotting, display, etc.
 
 @created May 9, 2022
 """
-# from mobilkit import (dt, gpd, IPython, json, mpl, np, os, Path, 
-#                       pd, plt, pyspark, re, sns, warnings, yaml)
-
-# from datetime import datetime, date
 import datetime as dt
 import json
 import os
@@ -16,7 +12,6 @@ import warnings
 
 import geopandas as gpd
 import IPython
-# from IPython.display import display
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np

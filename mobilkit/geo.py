@@ -1,11 +1,7 @@
-# from mobilkit import (glob, gpd, hs, it, json, np, op, os, Path, pd, 
-#                       requests, scipy, shutil, sklearn, urllib, warnings)
-
 from glob import glob
 import itertools as it
 import json
 import operator as op
-# from operator import itemgetter
 import os
 from pathlib import Path
 import shutil
@@ -14,15 +10,12 @@ import warnings
 
 import geopandas as gpd
 from geopandas import GeoDataFrame as Gdf
-# from haversine import haversine_vector
 import haversine as hs
 import numpy as np
 import pandas as pd
 import requests
 import scipy
 import sklearn
-# import scipy.spatial import cKDTree
-# from sklearn.cluster import MeanShift
 
 # Global coordinate reference systems (CRS) for uniformity (chosen arbitrarily).
 # spatial CRS with coordintates in meters

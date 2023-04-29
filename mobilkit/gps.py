@@ -2,11 +2,8 @@
 
 import datetime as dt
 from functools import reduce
-import os
 from pathlib import Path
-import warnings
 
-# from haversine import haversine_vector as haversine
 import haversine as hs
 import numpy as np
 import pandas as pd
@@ -14,7 +11,6 @@ from pyspark.sql import functions as F
 from pyspark.sql import DataFrame as Sdf
 import pytz
 import sklearn
-# from sklearn.cluster import MeanShift
 
 from mobilkit.spark import Types as T
 from mobilkit.spark import write
@@ -249,7 +245,7 @@ def collect_days_data(sp, root, dates, fmt='%Y-%m-%d'):
         def add_day(t): return [t + nDays * 86400 for t in t]
         d = d.withColumn(TS, F.udf(add_day, T.array(T.float))(TS))
         df.append(d)
-    df = reduce(pyspark.sql.DataFrame.union, df)
+    df = reduce(Sdf.union, df)
     df = df.groupby(UID).agg(*[F.flatten(F.collect_list(x)).alias(x) 
                                for x in [LON, LAT, TS]])
     return df

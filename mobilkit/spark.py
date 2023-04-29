@@ -1,13 +1,9 @@
-# from mobilkit import (os, Path, pyspark, shutil, warnings)
-
 import os, shutil
 from pathlib import Path
 import warnings
 
 import pyspark
-# from pyspark.sql.functions import arrays_zip
-
-# import mobilkit as mk
+import pyspark.sql.functions as F
 
 # Default configuration of the pyspark session. This dictionary is overwritten
 # by the configuration parameters in the `project.yaml` file under the variable
@@ -24,7 +20,6 @@ DEFAULT_CONFIG = {
     'sql.debug.maxToStringFields':          100,
     'sql.execution.arrow.pyspark.enabled':  'true',
 }
-
 
 class Types:
     """
@@ -110,8 +105,7 @@ def write(df, outdir, parts=None, compress=False, overwrite=True):
 def zip_cols(df, key_cols, col_name):
     if isinstance(key_cols, str): key_cols = [key_cols]
     cols = [x for x in df.columns if not x in key_cols]
-    zipper = pyspark.sql.functions.arrays_zip
-    return df.select(*key_cols, zipper(*cols).alias(col_name))
+    return df.select(*key_cols, F.arrays_zip(*cols).alias(col_name))
 
 
 # def unzip_cols(df, col_name='pts', uid=UID, x=LON, y=LAT, t=TS, e=ERR):
