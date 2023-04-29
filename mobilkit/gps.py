@@ -1,4 +1,4 @@
-from __init__ import *
+from __init__ import (dt, F, hs, np, Path, pyspark, pytz, reduce)
 
 # import datetime as dt
 # from functools import reduce
@@ -129,7 +129,7 @@ def get_user_pings(sp, date, inroot, outroot=None, tz='UTC',
     if offset < 0:
         # if the file of the next date exists, read its data
         date2 = date + dt.timedelta(days=1)
-        if os.path.exists(get_path(date2)):
+        if get_path(date2).exists():
             df2 = read_cols(sp.read_csv(get_path(date2)))
             # get the time difference of the pings from the GMT timestamp of
             # the next day's start, shifted to local (given) time zone
@@ -146,7 +146,7 @@ def get_user_pings(sp, date, inroot, outroot=None, tz='UTC',
     if offset > 0:
         # if the file of the previous date exists, read its data
         date2 = date - dt.timedelta(days=1)
-        if os.path.exists(get_path(date2)):
+        if get_path(date2).exists():
             df2 = read_cols(sp.read_csv(get_path(date2)))
             # get the time difference of the pings from the GMT timestamp of
             # the current day's start, shifted to local (given) time zone
@@ -673,7 +673,7 @@ def get_home_work_loc_data(sp, dates, root, day_hrs, min_pings=None,
             df = df.union(filt_xy(df2, lambda t: t <= start or t >= end))
         # for the last day, select only the morning time (if its data exists)
         next_day_dir = get_dir(dates[-1] + dt.timedelta(days=1))
-        if os.path.exists(next_day_dir):
+        if next_day_dir.exists():
             df2 = zip_xyt(read_date(dates[-1] + dt.timedelta(days=1)))
             df = df.union(filt_xy(df2, lambda t: t <= start))
     elif kind == 'work':

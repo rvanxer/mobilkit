@@ -1,7 +1,7 @@
 """
 Only applicable for US Census and American Community Survey (ACS) analysis.
 """
-from __init__ import *
+from __init__ import (it, pd, re, requests)
 
 # from itertools import zip_longest
 # import re
