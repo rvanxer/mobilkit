@@ -1,13 +1,14 @@
 """
 Only applicable for US Census and American Community Survey (ACS) analysis.
 """
-from __init__ import (it, pd, re, requests)
+# from mobilkit import (it, pd, re, requests)
 
 # from itertools import zip_longest
-# import re
-# import requests
+import itertools as it
+import re
+import requests
 
-# import pandas as pd
+import pandas as pd
 # from pandas import DataFrame as pd.DataFrame
 
 # base URL for the census data API

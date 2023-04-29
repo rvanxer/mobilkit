@@ -1,10 +1,10 @@
-from __init__ import (os, Path, pyspark, shutil, utils, warnings)
+# from mobilkit import (os, Path, pyspark, shutil, warnings)
 
-# import os, shutil
-# from pathlib import Path
-# import warnings
+import os, shutil
+from pathlib import Path
+import warnings
 
-# import pyspark
+import pyspark
 # from pyspark.sql.functions import arrays_zip
 
 # import mobilkit as mk
@@ -99,7 +99,7 @@ def write(df, outdir, parts=None, compress=False, overwrite=True):
         shutil.rmtree(outdir)
     if isinstance(parts, int):
         df = df.repartition(parts)
-    outdir = str(utils.mkdir(outdir.parent) / outdir.stem)
+    outdir = outdir.parent.mkdir(parents=True, exist_ok=True) / outdir.stem
     if compress:
         (df.write.option('compression', 'none').mode('overwrite')
          .option('compression', 'snappy').save(outdir))
