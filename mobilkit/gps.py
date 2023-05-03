@@ -1,14 +1,16 @@
-import datetime as dt
-import os
-from pathlib import Path
-import warnings
+# from mobilkit import (dt, F, hs, np, Path, pyspark, pytz, reduce)
 
-from haversine import haversine_vector as haversine
+import datetime as dt
+from functools import reduce
+from pathlib import Path
+
+import haversine as hs
 import numpy as np
 import pandas as pd
 from pyspark.sql import functions as F
+from pyspark.sql import DataFrame as Sdf
 import pytz
-from sklearn.cluster import MeanShift
+import sklearn
 
 from mobilkit.spark import Types as T
 from mobilkit.spark import write
@@ -125,7 +127,7 @@ def get_user_pings(sp, date, inroot, outroot=None, tz='UTC',
     if offset < 0:
         # if the file of the next date exists, read its data
         date2 = date + dt.timedelta(days=1)
-        if os.path.exists(get_path(date2)):
+        if get_path(date2).exists():
             df2 = read_cols(sp.read_csv(get_path(date2)))
             # get the time difference of the pings from the GMT timestamp of
             # the next day's start, shifted to local (given) time zone
@@ -142,7 +144,7 @@ def get_user_pings(sp, date, inroot, outroot=None, tz='UTC',
     if offset > 0:
         # if the file of the previous date exists, read its data
         date2 = date - dt.timedelta(days=1)
-        if os.path.exists(get_path(date2)):
+        if get_path(date2).exists():
             df2 = read_cols(sp.read_csv(get_path(date2)))
             # get the time difference of the pings from the GMT timestamp of
             # the current day's start, shifted to local (given) time zone
@@ -187,7 +189,7 @@ def get_dist_zipped(df, x=LON, y=LAT, dist='dist', unit='m', dtype=T.float):
     def udf(x, y):
         try:
             src, trg = list(zip(y[:-1], x[:-1])), list(zip(y[1:], x[1:]))
-            return [0.] + haversine(src, trg, unit=unit).tolist()
+            return [0.] + hs.haversine_vector(src, trg, unit=unit).tolist()
         except Exception:
             return []
     df = df.withColumn(dist, F.udf(udf, T.array(dtype))(x, y))
@@ -216,7 +218,7 @@ def get_motion_metrics(df, zero_tol=1e-6, dist='dist', tdiff='tdiff',
     df = df.filter(F.size(lon) > 2)
     def get_dist(x, y):
         src, trg = list(zip(y[:-1], x[:-1])), list(zip(y[1:], x[1:]))
-        return [0.] + haversine(src, trg, unit='m').tolist()
+        return [0.] + hs.haversine_vector(src, trg, unit='m').tolist()
     def get_tdiff(t):
         return [0.] + np.diff(t).astype(float).tolist()
     def get_speed(d, t):
@@ -227,6 +229,25 @@ def get_motion_metrics(df, zero_tol=1e-6, dist='dist', tdiff='tdiff',
     df = df.withColumn(tdiff, F.udf(get_tdiff, T.array(T.float))(ts))
     df = df.withColumn(speed, F.udf(get_speed, T.array(T.float))(dist, tdiff))
     df = df.withColumn(accel, F.udf(get_accel, T.array(T.float))(speed, tdiff))
+    return df
+
+
+def collect_days_data(sp, root, dates, fmt='%Y-%m-%d'):
+    """
+    Collect multiple days' user-ping data into one list by addting 
+    the number of seconds of each day to the timestamp.
+    """
+    df = []
+    dates = sorted(dates)
+    for date in dates:
+        d = sp.read_parquet(root / date.strftime(fmt))
+        nDays = (date - dates[0]).days
+        def add_day(t): return [t + nDays * 86400 for t in t]
+        d = d.withColumn(TS, F.udf(add_day, T.array(T.float))(TS))
+        df.append(d)
+    df = reduce(Sdf.union, df)
+    df = df.groupby(UID).agg(*[F.flatten(F.collect_list(x)).alias(x) 
+                               for x in [LON, LAT, TS]])
     return df
 
 
@@ -650,7 +671,7 @@ def get_home_work_loc_data(sp, dates, root, day_hrs, min_pings=None,
             df = df.union(filt_xy(df2, lambda t: t <= start or t >= end))
         # for the last day, select only the morning time (if its data exists)
         next_day_dir = get_dir(dates[-1] + dt.timedelta(days=1))
-        if os.path.exists(next_day_dir):
+        if next_day_dir.exists():
             df2 = zip_xyt(read_date(dates[-1] + dt.timedelta(days=1)))
             df = df.union(filt_xy(df2, lambda t: t <= start))
     elif kind == 'work':

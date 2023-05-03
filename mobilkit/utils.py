@@ -3,7 +3,7 @@ Miscellaneous utility functions for file handling, plotting, display, etc.
 
 @created May 9, 2022
 """
-from datetime import datetime, date
+import datetime as dt
 import json
 import os
 from pathlib import Path
@@ -11,17 +11,18 @@ import re
 import warnings
 
 import geopandas as gpd
-from IPython.display import display
+import IPython
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib.ticker import EngFormatter
 import numpy as np
 import pandas as pd
 import pyspark
-import seaborn
+import seaborn as sns
 import yaml
 
 # Unit conversion factors
+M2FT = 3.28084 # meter to feet
+FT2M = 1 / 3.28084 # feet to meter
 MI2M = 1609.34  # mile to meter
 M2MI = 1 / 1609.34  # meter to mile
 MI2KM = 1.60934  # mile to kilometer
@@ -73,6 +74,9 @@ class Params:
         self._data = update_nested_dict(self._data, values)
         if write:
             self.write()
+            
+    def __setitem__(self, values, write=True):
+        self.set(values, write)
     
     def read(self):
         if os.path.exists(self.path):
@@ -150,18 +154,27 @@ def ignore_warnings(func):
     return wrapper
 
 
+def load_yaml(path):
+    """
+    Load the contents of a YAML file.
+    """
+    with open(path, 'rb') as f:
+        content = yaml.safe_load(f)
+    return content
+
+
 def log(msg):
     """
     Print a message with timestamp.
     """
-    print(f'[{datetime.now()}] {msg}')
+    print(f'[{dt.datetime.now()}] {msg}')
     
 
 def str2dt(date_str):
     """
     Convert a date string in the 'YYYY-MM-DD' format to a datetime time object.
     """
-    return date(*[int(x) for x in date_str.split('-')])
+    return dt.date(*[int(x) for x in date_str.split('-')])
 
 
 def dates(start: str, end: str):
@@ -170,12 +183,12 @@ def dates(start: str, end: str):
 
 def to_date(x, fmt='%Y-%m-%d'):
     """ Convert an input to date, esp. if in string format. """
-    if isinstance(x, date):
+    if isinstance(x, dt.date):
         return x
     if isinstance(x, str):
-        return datetime.strptime(x, fmt).date()
+        return dt.datetime.strptime(x, fmt).date()
     if type(x) in [list, tuple] and len(x) == 3:
-        return date(*x)
+        return dt.date(*x)
     else:
         raise TypeError('Date must be of either type `datetime.date` '
                         f'or `str`, but supplied: {type(x)}')
@@ -265,8 +278,9 @@ def disp(x, top=1, mem=True, vert=False):
         if tabular:
             types = {x.index.name or '': '<' + x.dtypes.astype(str) + '>'}
             types = pd.DataFrame(types).T
-            display(pd.concat([types, x.head(top).astype({'geometry': str}) if
-                    crs else x.head(top)]))
+            df = pd.concat([types, x.head(top).astype({'geometry': str}) if
+                           crs else x.head(top)])
+            IPython.display.display(df)
         else:
             print(x.head(top))
 
@@ -311,7 +325,7 @@ def config_display(
     -------
     None
     """
-    seaborn.set_style(sns_style)
+    sns.set_style(sns_style)
     for opt in pd_options:
         pd.set_option(*opt)
     mpl.rcParams.update(mpl_options)
@@ -351,7 +365,7 @@ def imsave(title=None, fig=None, ax=None, dpi=200, root='./fig', ext='png', opaq
     fig = fig or plt.gcf()
     ax = ax or fig.axes[0]
     title = title or fig._suptitle or ax.get_title() or 'Untitled {}'.format(
-        datetime.now().strftime('%Y-%m-%d_%H-%m-%S'))
+        dt.datetime.now().strftime('%Y-%m-%d_%H-%m-%S'))
     title = re.sub(r'[^A-Za-z\s\d,.-]', '_', title)
     fig.savefig(f'{mkdir(root)}/{title}.{ext}', dpi=dpi, bbox_inches='tight',
                 transparent=not opaque, facecolor='white' if opaque else 'auto')
@@ -413,8 +427,8 @@ def plot(ax=None, fig=None, size=None, dpi=100, title=None, xlab=None,
     ax.set_ylabel(ylab, fontsize=ylabsize or mpl.rcParams['axes.labelsize'])
     if xlim: ax.set_xlim(*xlim)
     if ylim: ax.set_ylim(*ylim)
-    if xeng: ax.xaxis.set_major_formatter(EngFormatter())
-    if yeng: ax.yaxis.set_major_formatter(EngFormatter())
+    if xeng: ax.xaxis.set_major_formatter(mpl.ticker.EngFormatter())
+    if yeng: ax.yaxis.set_major_formatter(mpl.ticker.EngFormatter())
     if xlog: ax.set_xscale('log')
     if ylog: ax.set_yscale('log')
     if xticks: ax.set_xticks(xticks)
@@ -429,6 +443,6 @@ def plot(ax=None, fig=None, size=None, dpi=100, title=None, xlab=None,
         for s in ['left', 'right', 'top', 'bottom']:
             ax.spines[s].set_color(framebordercolor)
     fig = fig or plt.gcf()
-    auto_title = 'Untitled-' + datetime.now().isoformat().replace(':', '-')
+    auto_title = 'Untitled-' + dt.datetime.now().isoformat().replace(':', '-')
     if save: imsave(title or auto_title, root=mkdir(path), fig=fig)
     return ax
