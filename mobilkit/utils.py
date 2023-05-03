@@ -21,6 +21,8 @@ import seaborn as sns
 import yaml
 
 # Unit conversion factors
+M2FT = 3.28084 # meter to feet
+FT2M = 1 / 3.28084 # feet to meter
 MI2M = 1609.34  # mile to meter
 M2MI = 1 / 1609.34  # meter to mile
 MI2KM = 1.60934  # mile to kilometer
