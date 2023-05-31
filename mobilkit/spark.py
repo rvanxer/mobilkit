@@ -1,9 +1,9 @@
 import os, shutil
 from pathlib import Path
-import warnings
 
 import pyspark
 import pyspark.sql.functions as F
+import shutup
 
 # Default configuration of the pyspark session. This dictionary is overwritten
 # by the configuration parameters in the `project.yaml` file under the variable
@@ -145,6 +145,7 @@ class Spark:
         """
         Start pyspark session and store relevant objects.
         """
+        shutup.please()
         if not self.context and not self.session:
             # set the configuration
             self.config = pyspark.SparkConf().setAll(list(self.config.items()))
@@ -153,6 +154,7 @@ class Spark:
             # start the session and set its log level
             self.session = pyspark.sql.SparkSession(self.context)
             self.session.sparkContext.setLogLevel(self.log_level)
+        shutup.jk()
 
     def empty_df(self, cols):
         """
@@ -234,7 +236,7 @@ class Spark:
         df : pyspark.sql.DataFrame
             Output dataframe (same schema as the input dataframe).
         """
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore')
-            df = self.session.createDataFrame(df)
+        shutup.please()
+        df = self.session.createDataFrame(df)
+        shutup.jk()
         return df

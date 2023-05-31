@@ -7,7 +7,6 @@ from glob import glob
 import itertools as it
 import os
 from pathlib import Path
-import warnings
 
 # Commonly used external imports
 import geopandas as gpd
@@ -23,6 +22,7 @@ import pyspark
 from pyspark.sql import functions as F
 from pyspark.sql import DataFrame as Sdf
 import seaborn as sns
+import shutup
 from tqdm.notebook import tqdm
 
 # Imports from mobilkit
