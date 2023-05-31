@@ -328,7 +328,7 @@ def config_display(
     sns.set_style(sns_style)
     for opt in pd_options:
         pd.set_option(*opt)
-    mpl.rcParams.update(mpl_options)
+    # mpl.rcParams.update(mpl_options)
     if disp_method:
         pd.DataFrame.disp = disp
         gpd.GeoDataFrame.disp = disp

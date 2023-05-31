@@ -33,7 +33,8 @@ from mobilkit.geo import CRS_DEG, CRS_M
 from mobilkit.gps import (UID, LON, LAT, TS, ERR)
 
 # Display settings
-mk.utils.config_display(disp_method=True)
+# mk.utils.config_display(disp_method=True)
+mk.utils.config_display(pd_option=[], disp_method=True)
 plt.rcParams.update(mk.utils.MPL_RCPARAMS)
 mpl.rcParams.update(mk.utils.MPL_RCPARAMS)
 
