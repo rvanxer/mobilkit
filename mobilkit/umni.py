@@ -45,12 +45,15 @@ QUADRANT = UMNI / 'data/Quadrant'
 SAFEGRAPH = UMNI / 'data/SafeGraph'
 # root directory for all projects
 MK = UMNI / 'users/verma99/mk'
+# Python interpreter for UMNI projects
+# (to fix a malfunction after removing the `rajat` conda environment)
+MK_PYTHON = UMNI / 'users/verma99/anaconda3/envs/mk3.9/bin/python'
 
 # Pyspark session handler
 # configuration depends on the host server of the script
 SERVER = os.uname().nodename.split('.')[0]
 # set the handler
-os.environ['PYSPARK_PYTHON'] = str((MK / '../anaconda3/envs/mk3.9/bin/python').resolve())
+os.environ['PYSPARK_PYTHON'] = str(MK_PYTHON)
 # Pyspark session handler with resources allocated 
 # according to the host server
 SP = mk.spark.Spark({k: v.get(SERVER, None) for k, v in {
@@ -58,6 +61,8 @@ SP = mk.spark.Spark({k: v.get(SERVER, None) for k, v in {
     'driver.memory': dict(tnet1='200g', umni1='36g', umni2='36g', umni5='160g'),
     'default.parallelism': dict(tnet1=16, umni1=20, umni2=20, umni5=32)
 }.items()}, start=False)
+# set the executor for this environment
+SP.context.pythonExec = str(MK_PYTHON)
 
 # Project setup
 class Project:
