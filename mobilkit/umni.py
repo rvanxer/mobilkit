@@ -62,7 +62,7 @@ SP = mk.spark.Spark({k: v.get(SERVER, None) for k, v in {
     'default.parallelism': dict(tnet1=16, umni1=20, umni2=20, umni5=32)
 }.items()}, start=False)
 # set the executor for this environment
-SP.context.pythonExec = str(MK_PYTHON)
+# SP.context.pythonExec = str(MK_PYTHON)
 
 # Project setup
 class Project:

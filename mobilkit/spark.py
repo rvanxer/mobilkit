@@ -94,10 +94,10 @@ def write(df, outdir, parts=None, compress=False, overwrite=True):
         shutil.rmtree(outdir)
     if isinstance(parts, int):
         df = df.repartition(parts)
-    outdir = outdir.parent.mkdir(parents=True, exist_ok=True) / outdir.stem
+    outdir.parent.mkdir(parents=True, exist_ok=True)
     if compress:
         (df.write.option('compression', 'none').mode('overwrite')
-         .option('compression', 'snappy').save(outdir))
+         .option('compression', 'snappy').save(str(outdir)))
     else:
         df.write.parquet(outdir)
 

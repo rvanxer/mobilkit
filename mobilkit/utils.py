@@ -214,6 +214,23 @@ def standardize(x, err=1e-10):
     return (x - x.mean()) / (x.std() + err)
 
 
+def bicolor_cmap(from_rgb, to_rgb, name='Untitled'):
+    """
+    Generate a continuous colormap from two given colors, given as 
+    RGB tuples (0-1).
+    Taken from https://stackoverflow.com/a/16278416/5711244
+    
+    Parameters
+    ----------
+    from_rgb, to_rgb : tuple[3]<float>
+    """
+    (r1, g1, b1), (r2, g2, b2) = from_rgb, to_rgb
+    colors = {'red': ((0, r1, r1), (1, r2, r2)),
+              'green': ((0, g1, g1), (1, g2, g2)),
+              'blue': ((0, b1, b1), (1, b2, b2))}
+    return mpl.colors.LinearSegmentedColormap(name, colors)
+
+
 def write_json(obj, path, suffix='.params'):
     """
     Write a dictionary as a JSON file, usually to show the parameters

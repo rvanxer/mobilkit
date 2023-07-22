@@ -161,7 +161,7 @@ def get_user_pings(sp, date, inroot, outroot=None, tz='UTC',
     df = df.sort(TS).groupby(UID).agg(*[
         F.collect_list(x).alias(x) for x in [LON, LAT, TS, ERR]])
     # write the data
-    if isinstance(outroot, str):
+    if type(outroot) in [str, Path]:
         write(df, mkdir(outroot) / date.strftime(out_fmt), compress=True)
     return df
 
