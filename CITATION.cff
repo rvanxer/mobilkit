@@ -6,7 +6,7 @@ authors:
   orcid: "https://orcid.org/0000-0002-2273-8706"
 - family-names: "Ukkusuri"
   given-names: "Satish V."
-title: "Mobilkit Plus"
+title: "Mobilkit Plus: A toolkit for processing large-scale mobile phone GPS data"
 version: 1.0.0
 doi: 10.5281/zenodo.1234
 date-released: 2023-06-15
