@@ -1,5 +1,3 @@
-# from mobilkit import *
-
 # Commonly used built-in imports
 import datetime as dt
 from functools import reduce
@@ -25,16 +23,17 @@ import seaborn as sns
 from tqdm.notebook import tqdm
 
 # Imports from mobilkit
-import mobilkit as mk
+# import mobilkit as mk # importing this is causing circular import error
 from mobilkit import utils as U
 from mobilkit.spark import Types as T
+from mobilkit.spark import Spark
 from mobilkit.geo import CRS_DEG, CRS_M
-from mobilkit.gps import (UID, LON, LAT, TS, ERR)
+from mobilkit.gps import UID, LON, LAT, TS, ERR
 
 # Display settings
-mk.utils.config_display(disp_method=True)
-plt.rcParams.update(mk.utils.MPL_RCPARAMS)
-mpl.rcParams.update(mk.utils.MPL_RCPARAMS)
+U.config_display(disp_method=True)
+plt.rcParams.update(U.MPL_RCPARAMS)
+mpl.rcParams.update(U.MPL_RCPARAMS)
 
 # Important paths
 # common root directory of TNET-1, UMNI-2 & UMNI-5
@@ -46,7 +45,6 @@ SAFEGRAPH = UMNI / 'data/SafeGraph'
 # root directory for all projects
 MK = UMNI / 'users/verma99/mk'
 # Python interpreter for UMNI projects
-# (to fix a malfunction after removing the `rajat` conda environment)
 MK_PYTHON = UMNI / 'users/verma99/anaconda3/envs/mk3.9/bin/python'
 
 # Pyspark session handler
@@ -56,33 +54,10 @@ SERVER = os.uname().nodename.split('.')[0]
 os.environ['PYSPARK_PYTHON'] = str(MK_PYTHON)
 # Pyspark session handler with resources allocated 
 # according to the host server
-SP = mk.spark.Spark({k: v.get(SERVER, None) for k, v in {
+SP = Spark({k: v.get(SERVER, None) for k, v in {
     'executor.memory': dict(tnet1='200g', umni1='36g', umni2='36g', umni5='160g'),
     'driver.memory': dict(tnet1='200g', umni1='36g', umni2='36g', umni5='160g'),
     'default.parallelism': dict(tnet1=16, umni1=20, umni2=20, umni5=32)
-}.items()}, start=False)
+    }.items()}, start=False)
 # set the executor for this environment
 # SP.context.pythonExec = str(MK_PYTHON)
-
-# Project setup
-class Project:
-    def __init__(self, root):
-        # convert the supplied project root path into absolute path
-        self.root = root = Path(root).resolve()
-        # resolve the name of this project
-        self.name = root.stem.replace('_', ' ').title()
-        # directory containing all the relevant project-specific data
-        self.data = U.mkdir(root / 'data')
-        # directory where the output figures are stored
-        self.fig = root / 'fig'
-        # create a parameters file
-        self.params = U.Params(self.root / 'params')
-
-    def __repr__(self):
-        return f'Project("{self.name}")'
-
-    def imsave(self, *args, **kwargs):
-        # customize the `mobilkit.utils.plot()` function with
-        # this project's image output directory path
-        root = Path(kwargs.pop('root', self.fig))
-        U.imsave(*args, root=root, **kwargs)

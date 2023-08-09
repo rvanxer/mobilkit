@@ -78,7 +78,7 @@ def write(df, outdir, parts=None, compress=False, overwrite=True):
     ----------
     df : pyspark.sql.DataFrame
         Dataframe to be written.
-    outdir : str
+    outdir : str | Path
         Folder to which parquet files will be written.
     parts : int | None
         Number of partitions (parquet files).
@@ -99,7 +99,7 @@ def write(df, outdir, parts=None, compress=False, overwrite=True):
         (df.write.option('compression', 'none').mode('overwrite')
          .option('compression', 'snappy').save(str(outdir)))
     else:
-        df.write.parquet(outdir)
+        df.write.parquet(str(outdir))
 
 
 def zip_cols(df, key_cols, col_name):

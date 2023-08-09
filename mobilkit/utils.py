@@ -42,6 +42,29 @@ MPL_RCPARAMS = {
     'figure.dpi': 100
 }
 
+# Project setup
+class Project:
+    def __init__(self, root):
+        # convert the supplied project root path into absolute path
+        self.root = root = Path(root).resolve()
+        # resolve the name of this project
+        self.name = root.stem.replace('_', ' ').title()
+        # directory containing all the relevant project-specific data
+        self.data = mkdir(root / 'data')
+        # directory where the output figures are stored
+        self.fig = root / 'fig'
+        # create a parameters file
+        self.params = Params(self.root / 'params')
+
+    def __repr__(self):
+        return f'Project("{self.name}")'
+
+    def imsave(self, *args, **kwargs):
+        # customize the `mobilkit.utils.plot()` function with
+        # this project's image output directory path
+        root = Path(kwargs.pop('root', self.fig))
+        imsave(*args, root=root, **kwargs)
+
 
 class Params:
     """

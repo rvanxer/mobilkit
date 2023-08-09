@@ -1,5 +1,3 @@
 from mobilkit import (
-    acs, geo, gps, spark, umni, utils
+    acs, geo, gps, spark, utils, umni
 )
-
-

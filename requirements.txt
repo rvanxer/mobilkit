@@ -18,4 +18,5 @@ scikit-learn>=1.0.1
 scipy>=1.8.1
 seaborn>=0.11.2
 shapely>=1.8.0
+shutup>=0.2.0
 tqdm>=4.62.3
