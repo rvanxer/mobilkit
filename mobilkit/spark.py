@@ -9,16 +9,16 @@ import shutup
 # by the configuration parameters in the `project.yaml` file under the variable
 # `spark_config`.
 DEFAULT_CONFIG = {
-    'sql.shuffle.partitions':               40,
-    'driver.maxResultSize':                 0,
-    'executor.memory':                      '36g',
-    'executor.cores':                       10,
-    'cores.max':                            10,
-    'driver.memory':                        '36g',
-    'default.parallelism':                  12,
-    'sql.session.timeZone':                 'GMT',
-    'sql.debug.maxToStringFields':          100,
-    'sql.execution.arrow.pyspark.enabled':  'true',
+    'sql.shuffle.partitions': 40,
+    'driver.maxResultSize': 0,
+    'executor.memory': '36g',
+    'executor.cores': 10,
+    'cores.max': 10,
+    'driver.memory': '36g',
+    'default.parallelism': 12,
+    'sql.session.timeZone': 'GMT',
+    'sql.debug.maxToStringFields': 100,
+    'sql.execution.arrow.pyspark.enabled': 'true',
 }
 
 class Types:

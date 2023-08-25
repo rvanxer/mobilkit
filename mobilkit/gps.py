@@ -1,5 +1,4 @@
-# from mobilkit import (dt, F, hs, np, Path, pyspark, pytz, reduce)
-
+# %%
 import datetime as dt
 from functools import reduce
 from pathlib import Path
@@ -23,21 +22,61 @@ LAT = 'lat'  # latitude (degrees)
 TS = 'ts'  # timestamp or time since beginning of day (usually in seconds)
 ERR = 'error'  # GPS error radius (meters), an indicator of ping's accuracy
 
+# %%
+# def read_cols(df, cols=[
+#     ('_c0', UID, T.str),
+#     ('_c3', LON, T.float),
+#     ('_c2', LAT, T.float),
+#     ('_c5', TS, T.int64),
+#     ('_c4', ERR, T.float)
+# ]):
+#     """
+#     Read specific columns of a raw/original Quadrant table.
 
-def read_cols(df, cols=[
-    ('_c0', UID, T.str),
-    ('_c3', LON, T.float),
-    ('_c2', LAT, T.float),
-    ('_c5', TS, T.int64),
-    ('_c4', ERR, T.float)
-]):
+#     Parameters
+#     ----------
+#     df : pyspark.sql.DataFrame
+#         Pings table in the original/raw Quadrant CSV.gz data files.
+#     cols : list[tuple[str, str, pyspark.sql.types.<Type>]]
+#         Columns of interest, given as 3-tuples: (original name, new name, )
+#         - `old`: original column name, usually '_c0', '_c1', etc.
+#         - `new`: new desired column name (should ideally be templated)
+#         - `dtype`: desired data type just after reading the data.
+
+#     Returns
+#     -------
+#     df : pyspark.sql.DataFrame
+#         Table with the selected columns, cast into the input data types.
+#     """
+#     return df.select([F.col(old).cast(dtype).alias(new) for old, new, dtype in cols])
+
+# %%
+def read_date_df(sp, date, inroot, in_fmt='year={}/month={}/day={}', 
+                 kind='csv', cols=[('_c0', UID, T.str),
+                                   ('_c3', LON, T.float),
+                                   ('_c2', LAT, T.float),
+                                   ('_c5', TS, T.int64),
+                                   ('_c4', ERR, T.float)]):
     """
-    Read specific columns of a raw/original Quadrant table.
+    Read the pings table of a given date under assumptions about the file 
+    structure.
 
     Parameters
     ----------
-    df : pyspark.sql.DataFrame
-        Pings table in the original/raw Quadrant CSV.gz data files.
+    sp : mobilkit.spark.Spark
+        Pyspark session handler.
+    date : Date
+        Date of interest.
+    inroot : str
+        Folder or file containing raw/original pings in .gz.csv format. Their
+        columns are not named.
+    in_fmt : str
+        String format of the given date's data folder inside the `inroot`
+        directory. E.g., format = 'year={}/month={}/day={}' for a folder called
+        '{inroot}/year=2022/month=03/day=01'.
+    kind : str
+        Indicator of the format of the data files.
+        Allowed values: {csv, parquet}.
     cols : list[tuple[str, str, pyspark.sql.types.<Type>]]
         Columns of interest, given as 3-tuples: (original name, new name, )
         - `old`: original column name, usually '_c0', '_c1', etc.
@@ -49,10 +88,19 @@ def read_cols(df, cols=[
     df : pyspark.sql.DataFrame
         Table with the selected columns, cast into the input data types.
     """
-    return df.select([F.col(old).cast(dtype).alias(new) for old, new, dtype in cols])
+    assert kind in ['csv', 'parquet'], f'Prohibited file `kind`: `{kind}`'
+    # resolve the path of the data directory for the given date
+    path = Path(inroot) / in_fmt.format(*str(date).split('-'))
+    if kind == 'csv':
+        df = sp.read_csv(path)
+        df = df.select([F.col(old).cast(dtype).alias(new) for 
+                        old, new, dtype in cols])
+    elif kind == 'parquet':
+        df = sp.read_parquet(path)
+    return df
 
-
-def get_user_pings(sp, date, inroot, outroot=None, tz='UTC',
+# %%
+def get_user_pings(sp, date, inroot, outroot=None, tz='UTC', kind='csv',
                    in_fmt='year={}/month={}/day={}', out_fmt='%Y/%m/%d'):
     """
     Collect the ping coordinates and timestamps for each user (in a row) within
@@ -108,10 +156,12 @@ def get_user_pings(sp, date, inroot, outroot=None, tz='UTC',
     """
     # resolve the directory containing the data of a given date `d`
     def get_path(d): return Path(inroot) / in_fmt.format(*str(d).split('-'))
-    # read the data of the given date
-    df = sp.read_csv(get_path(date))
-    # select only relevant columns, rename them & change their dtypes
-    df = read_cols(df)
+    # # read the data of the given date
+    # df = sp.read_csv(get_path(date))
+    # # select only relevant columns, rename them & change their dtypes
+    # df = read_cols(df)
+    # read the data and filter its relevant columns
+    df = read_date_df(sp, date, inroot, in_fmt, kind)
     # compute the timestamp of the start time of the given date in GMT
     start_gmt = dt.datetime.fromisoformat(str(date)).timestamp()
     # compute the time difference (in seconds) of the given time zone with GMT
@@ -128,7 +178,8 @@ def get_user_pings(sp, date, inroot, outroot=None, tz='UTC',
         # if the file of the next date exists, read its data
         date2 = date + dt.timedelta(days=1)
         if get_path(date2).exists():
-            df2 = read_cols(sp.read_csv(get_path(date2)))
+            # df2 = read_cols(sp.read_csv(get_path(date2)))
+            df2 = read_date_df(sp, date2, inroot, in_fmt, kind)
             # get the time difference of the pings from the GMT timestamp of
             # the next day's start, shifted to local (given) time zone
             df2 = df2.withColumn(
@@ -145,7 +196,8 @@ def get_user_pings(sp, date, inroot, outroot=None, tz='UTC',
         # if the file of the previous date exists, read its data
         date2 = date - dt.timedelta(days=1)
         if get_path(date2).exists():
-            df2 = read_cols(sp.read_csv(get_path(date2)))
+            # df2 = read_cols(sp.read_csv(get_path(date2)))
+            df2 = read_date_df(sp, date2, inroot, in_fmt, kind)
             # get the time difference of the pings from the GMT timestamp of
             # the current day's start, shifted to local (given) time zone
             df2 = df2.withColumn(TS, F.col(TS) / 1000 - start_gmt)
@@ -165,12 +217,12 @@ def get_user_pings(sp, date, inroot, outroot=None, tz='UTC',
         write(df, mkdir(outroot) / date.strftime(out_fmt), compress=True)
     return df
 
-
+# %%
 def filter_bbox_long(df, left, bottom, right, top, xcol=LON, ycol=LAT):
     return df.filter(f'{left} <= {xcol} and {xcol} <= {right} and ' +
                      f'{bottom} <= {ycol} and {ycol} <= {top}')
 
-
+# %%
 def filter_bbox_zipped(df, left, bottom, right, top, col='pings', dtype=T.float):
     def udf(pings):
         return [tuple(p) for p in pings if
@@ -178,13 +230,13 @@ def filter_bbox_zipped(df, left, bottom, right, top, col='pings', dtype=T.float)
     df = df.withColumn(col, F.udf(udf, T.array(T.array(dtype)))(col))
     return df.filter(F.size(col) > 0)
 
-
+# %%
 def get_tdiff_zipped(df, time=TS, tdiff='tdiff', dtype=T.float):
     def udf(t):
         return [0.] + [float(t[i+1] - t[i]) for i in range(len(t)-1)]
     return df.withColumn(tdiff, F.udf(udf, T.array(dtype))(time))
 
-
+# %%
 def get_dist_zipped(df, x=LON, y=LAT, dist='dist', unit='m', dtype=T.float):
     def udf(x, y):
         try:
@@ -195,14 +247,14 @@ def get_dist_zipped(df, x=LON, y=LAT, dist='dist', unit='m', dtype=T.float):
     df = df.withColumn(dist, F.udf(udf, T.array(dtype))(x, y))
     return df.filter(F.size(dist) > 0)
 
-
+# %%
 def get_speed_zipped(df, dist='dist', tdiff='tdiff', speed='speed',
               zero_div_tol=1e-4, dtype=T.float):
     def udf(d, t):
         return [float(d / (t + zero_div_tol)) for d, t in zip(d, t)]
     return df.withColumn(speed, F.udf(udf, T.array(dtype))(dist, tdiff))
 
-
+# %%
 def get_accel_zipped(df, speed='speed', tdiff='tdiff', accel='accel',
               zero_div_tol=1e-4, dtype=T.float):
     def udf(v, t):
@@ -210,7 +262,7 @@ def get_accel_zipped(df, speed='speed', tdiff='tdiff', accel='accel',
                        for i in range(1, len(v) - 1)]
     return df.withColumn(accel, F.udf(udf, T.array(dtype))(speed, tdiff))
 
-
+# %%
 def get_motion_metrics(df, zero_tol=1e-6, dist='dist', tdiff='tdiff', 
                        speed='speed', accel='accel', lon=LON, lat=LAT, ts=TS):
     """
@@ -231,7 +283,7 @@ def get_motion_metrics(df, zero_tol=1e-6, dist='dist', tdiff='tdiff',
     df = df.withColumn(accel, F.udf(get_accel, T.array(T.float))(speed, tdiff))
     return df
 
-
+# %%
 def collect_days_data(sp, root, dates, fmt='%Y-%m-%d'):
     """
     Collect multiple days' user-ping data into one list by addting 
@@ -250,7 +302,7 @@ def collect_days_data(sp, root, dates, fmt='%Y-%m-%d'):
                                for x in [LON, LAT, TS]])
     return df
 
-
+# %%
 # def filter_user_pings_bbox(df, bbox, uid=UID, x=LON, y=LAT, t=TS, xyt='xyt',
 #                            in_zipped=False, out_zipped=False):
 #     """
@@ -305,8 +357,7 @@ def collect_days_data(sp, root, dates, fmt='%Y-%m-%d'):
 #                               enumerate([x, y, t])])
 #     return df
 
-
-# # noinspection PyChainedComparisons
+# %%
 # def get_n_filter_motion_metrics(df, max_speed=np.inf, max_accel=np.inf,
 #                                 max_decel=np.inf, div0_tol=1e-8, sort=True):
 #     """
@@ -394,8 +445,8 @@ def collect_days_data(sp, root, dates, fmt='%Y-%m-%d'):
 #     cols = enumerate([LON, LAT, TS, 'tdiff', 'dist', 'speed', 'accel'])
 #     df = df.select(UID, *[F.expr(f'X[{i}]').alias(x) for i, x in cols])
 #     return df
-#
-#
+
+## %%
 # def get_n_filter_motion_metrics_pd(df, max_speed=np.inf, max_accel=np.inf,
 #                                    max_decel=np.inf, div0_tol=1e-8, sort=True):
 #     """
@@ -598,7 +649,7 @@ def collect_days_data(sp, root, dates, fmt='%Y-%m-%d'):
 #     df = df.select(UID, 'n_pings', 'n_half_hrs', 'n_hrs')
 #     return df
 
-
+# %%
 def get_home_work_loc_data(sp, dates, root, day_hrs, min_pings=None,
                                kind='home', path_date_fmt='%Y-%m-%d'):
     """
@@ -693,7 +744,7 @@ def get_home_work_loc_data(sp, dates, root, day_hrs, min_pings=None,
                                  enumerate([LON, LAT, TS])])
     return df
 
-
+# %%
 # def _meanshift_home_work_locs(data: np.array, bandwidth: float, outliers: bool):
 #     """
 #     Get coordinates of the largest cluster's center for home/work location

@@ -71,7 +71,6 @@ class Params:
     A class for defining and updating configuration settings
     and parameters in a YAML file.
     """
-
     def __init__(self, path):
         self.path = Path(str(path) + '.yaml')
         self._data = {}
@@ -110,6 +109,24 @@ class Params:
         with open(self.path, 'w') as f:
             yaml.dump(self._data, f, indent=indent,
                       allow_unicode=True, sort_keys=sort)
+
+
+def is_nonempty(path):
+    """
+    Checks whether a given folder is non-empty (at least 1B).
+
+    Parameters
+    ----------
+    path : str | Path
+        Folder to be checked.
+
+    Returns
+    -------
+    bool
+        Whether the folder is non-empty.
+    """
+    path = Path(path)
+    return not (path.exists() and len(list(path.iterdir()) > 0))
 
 
 def mkdir(path):

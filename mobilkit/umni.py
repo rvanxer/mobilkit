@@ -23,7 +23,7 @@ import seaborn as sns
 from tqdm.notebook import tqdm
 
 # Imports from mobilkit
-# import mobilkit as mk # importing this is causing circular import error
+import mobilkit as mk
 from mobilkit import utils as U
 from mobilkit.spark import Types as T
 from mobilkit.spark import Spark
@@ -58,6 +58,6 @@ SP = Spark({k: v.get(SERVER, None) for k, v in {
     'executor.memory': dict(tnet1='200g', umni1='36g', umni2='36g', umni5='160g'),
     'driver.memory': dict(tnet1='200g', umni1='36g', umni2='36g', umni5='160g'),
     'default.parallelism': dict(tnet1=16, umni1=20, umni2=20, umni5=32)
-    }.items()}, start=False)
+}.items()} | {'local.dir': f'{MK}/.tmp'}, start=False)
 # set the executor for this environment
 # SP.context.pythonExec = str(MK_PYTHON)
