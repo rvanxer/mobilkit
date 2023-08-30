@@ -16,6 +16,5 @@ It is recommended to install this package in a new virtual environment.
 It can be installed using `pip` from [PyPi](https://pypi.org/project/pip/) by running the following command in a terminal:
 
 ```bash
-kw=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
 pip install git+https://rvanxer:$kw@github.com/rvanxer/mk.git
 ```
