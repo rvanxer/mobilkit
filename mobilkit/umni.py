@@ -39,9 +39,9 @@ mpl.rcParams.update(U.MPL_RCPARAMS)
 # common root directory of TNET-1, UMNI-2 & UMNI-5
 UMNI = Path('/home/umni2/a/umnilab')
 # base folder containing cleaned Quadrant ping data
-QUADRANT = UMNI / 'data/Quadrant'
+QUADRANT = UMNI / 'data/quadrant'
 # base folder containing SafeGraph's POI data
-SAFEGRAPH = UMNI / 'data/SafeGraph'
+SAFEGRAPH = UMNI / 'data/safegraph'
 # root directory for all projects
 MK = UMNI / 'users/verma99/mk'
 # Python interpreter for UMNI projects

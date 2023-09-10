@@ -12,10 +12,13 @@ This project aims to streamline data processing operations for multiple projects
 # - **`mobilkitplus`**: Package structure of the proposed toolkit. The main modules are in the folder `mobil`. -->
 
 ## Installation
-It is recommended to install this package in a new virtual environment.
-It can be installed using `pip` from [PyPi](https://pypi.org/project/pip/) by running the following command in a terminal:
-
+The current version of `mobilkit` uses `pyspark` for which it requires Python 3 version 3.9 or earlier.
+It is recommended to install this package in a new virtual environment. In `conda`, this may be done as:
 ```bash
-kw=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
-pip install git+https://rvanxer:$kw@github.com/rvanxer/mk.git
+conda create -n mk python=3.9.7
+conda activate mk
+```
+Then, it can be installed using `pip` from [PyPi](https://pypi.org/project/pip/):
+```bash
+pip install git+https://rvanxer@github.com/rvanxer/mk.git
 ```

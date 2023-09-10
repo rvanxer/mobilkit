@@ -51,12 +51,12 @@ ERR = 'error'  # GPS error radius (meters), an indicator of ping's accuracy
 #     return df.select([F.col(old).cast(dtype).alias(new) for old, new, dtype in cols])
 
 # %%
-def read_date_df(sp, date, inroot, in_fmt='year={}/month={}/day={}', 
-                 kind='csv', cols=[('_c0', UID, T.str),
-                                   ('_c3', LON, T.float),
-                                   ('_c2', LAT, T.float),
-                                   ('_c5', TS, T.int64),
-                                   ('_c4', ERR, T.float)]):
+def read_date_df(sp, date, inroot, in_fmt='year={}/month={}/day={}',
+                 header=False, kind='csv', cols=[('_c0', UID, T.str),
+                                                 ('_c3', LON, T.float),
+                                                 ('_c2', LAT, T.float),
+                                                 ('_c5', TS, T.int64),
+                                                 ('_c4', ERR, T.float)]):
     """
     Read the pings table of a given date under assumptions about the file 
     structure.
@@ -92,7 +92,7 @@ def read_date_df(sp, date, inroot, in_fmt='year={}/month={}/day={}',
     # resolve the path of the data directory for the given date
     path = Path(inroot) / in_fmt.format(*str(date).split('-'))
     if kind == 'csv':
-        df = sp.read_csv(path)
+        df = sp.read_csv(path, header=header)
         df = df.select([F.col(old).cast(dtype).alias(new) for 
                         old, new, dtype in cols])
     elif kind == 'parquet':
@@ -100,8 +100,8 @@ def read_date_df(sp, date, inroot, in_fmt='year={}/month={}/day={}',
     return df
 
 # %%
-def get_user_pings(sp, date, inroot, outroot=None, tz='UTC', kind='csv',
-                   in_fmt='year={}/month={}/day={}', out_fmt='%Y/%m/%d'):
+def get_user_pings(sp, date, inroot, outroot=None, tz='UTC', ts_ms=True,
+                   in_fmt='year={}/month={}/day={}', out_fmt='%Y/%m/%d', **kwargs):
     """
     Collect the ping coordinates and timestamps for each user (in a row) within
     one orignal (raw) Quadrant ping data file/folder after adjusting for time
@@ -154,14 +154,11 @@ def get_user_pings(sp, date, inroot, outroot=None, tz='UTC', kind='csv',
         $TS     [float]     seconds between ping time & start of the day
         $ERR    [float]     GPS error radii of the pings (meters)
     """
+    factor = 1000 if ts_ms else 1
     # resolve the directory containing the data of a given date `d`
     def get_path(d): return Path(inroot) / in_fmt.format(*str(d).split('-'))
-    # # read the data of the given date
-    # df = sp.read_csv(get_path(date))
-    # # select only relevant columns, rename them & change their dtypes
-    # df = read_cols(df)
     # read the data and filter its relevant columns
-    df = read_date_df(sp, date, inroot, in_fmt, kind)
+    df = read_date_df(sp, date, inroot, in_fmt, **kwargs)
     # compute the timestamp of the start time of the given date in GMT
     start_gmt = dt.datetime.fromisoformat(str(date)).timestamp()
     # compute the time difference (in seconds) of the given time zone with GMT
@@ -169,9 +166,9 @@ def get_user_pings(sp, date, inroot, outroot=None, tz='UTC', kind='csv',
               .utcoffset().total_seconds())
     # get the time difference of the pings from the timestamp of the start of
     # the given date measured in given time zone
-    df = df.withColumn(TS, F.col(TS) / 1000 - start_gmt)
+    df = df.withColumn(TS, F.col(TS) / factor - start_gmt)
     # filter the pings lying in the local time of [0, 24 hrs]
-    df = df.filter(F.col(TS).between(0, 24*3600))
+    df = df.filter(F.col(TS).between(0, 24 * 3600))
     # if the offset is negative (i.e., time zone west of GMT), read the
     # remainder of the pings present in the file of the next date
     if offset < 0:
@@ -179,11 +176,11 @@ def get_user_pings(sp, date, inroot, outroot=None, tz='UTC', kind='csv',
         date2 = date + dt.timedelta(days=1)
         if get_path(date2).exists():
             # df2 = read_cols(sp.read_csv(get_path(date2)))
-            df2 = read_date_df(sp, date2, inroot, in_fmt, kind)
+            df2 = read_date_df(sp, date2, inroot, in_fmt, **kwargs)
             # get the time difference of the pings from the GMT timestamp of
             # the next day's start, shifted to local (given) time zone
             df2 = df2.withColumn(
-                TS, F.col(TS) / 1000 - start_gmt - 24 * 3600)
+                TS, F.col(TS) / factor - start_gmt - 24 * 3600)
             # filter the pings with negative time difference (i.e., the pings
             # recorded before 00:00 local time of next day)
             df2 = df2.filter(F.col(TS) < 0)
@@ -197,10 +194,10 @@ def get_user_pings(sp, date, inroot, outroot=None, tz='UTC', kind='csv',
         date2 = date - dt.timedelta(days=1)
         if get_path(date2).exists():
             # df2 = read_cols(sp.read_csv(get_path(date2)))
-            df2 = read_date_df(sp, date2, inroot, in_fmt, kind)
+            df2 = read_date_df(sp, date2, inroot, in_fmt, **kwargs)
             # get the time difference of the pings from the GMT timestamp of
             # the current day's start, shifted to local (given) time zone
-            df2 = df2.withColumn(TS, F.col(TS) / 1000 - start_gmt)
+            df2 = df2.withColumn(TS, F.col(TS) / factor - start_gmt)
             # filter the pings with positive time difference (i.e., the pings
             # recorded after 00:00 local time of current day)
             df2 = df2.filter(F.col(TS) > 0)
