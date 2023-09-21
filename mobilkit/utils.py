@@ -32,14 +32,39 @@ SQM2SQMI = 1 / 2.58998811e6  # sq. meter to sq. mile
 
 # matplotlib custom plotting parameters
 MPL_RCPARAMS = {
+    'axes.edgecolor': 'k',
+    'axes.edgecolor': 'k',
+    'axes.formatter.use_mathtext': True,
+    'axes.labelcolor': 'k',
+    'axes.labelsize': 13,
+    'axes.linewidth': 0.5,
+    'axes.titlesize': 15,
+    'figure.dpi': 150,
     'figure.titlesize': 15,
-    'axes.titlesize': 14,
-    'axes.labelsize': 12,
-    'xtick.labelsize': 10,
-    'ytick.labelsize': 10,
+    'font.family': 'sans-serif',
+    'font.serif': ['Computer Modern Serif', 'DejaVu Serif'],
+    # 'font.serif': ['cmr10', 'Computer Modern Serif', 'DejaVu Serif'],
+    'grid.alpha': 0.15,
+    'grid.color': 'k',
+    'grid.linewidth': 0.5,
+    'legend.edgecolor': 'none',
+    'legend.facecolor': '.9',
     'legend.fontsize': 11,
+    'legend.framealpha': 0.5,
+    'legend.labelcolor': 'k',
     'legend.title_fontsize': 13,
-    'figure.dpi': 100
+    'mathtext.fontset': 'cm',
+    'text.color': 'k',
+    'text.color': 'k',
+    'text.usetex': True,
+    'xtick.bottom': True,
+    'xtick.color': 'k',
+    'xtick.labelsize': 10,
+    'xtick.minor.visible': True,
+    'ytick.color': 'k',
+    'ytick.labelsize': 10,
+    'ytick.left': True,
+    'ytick.minor.visible': True,
 }
 
 # Project setup
@@ -428,7 +453,7 @@ def imsave(title=None, fig=None, ax=None, dpi=200, root='./fig', ext='png', opaq
                 transparent=not opaque, facecolor='white' if opaque else 'auto')
 
 
-def plot(ax=None, fig=None, size=None, dpi=100, title=None, xlab=None,
+def plot(ax=None, fig=None, size=None, dpi=None, title=None, xlab=None,
          ylab=None, xlim=None, ylim=None, titlesize=None, xlabsize=None,
          ylabsize=None, xeng=False, yeng=False, xticks=None, yticks=None,
          xticks_rotate=None, yticks_rotate=None, xlog=False, ylog=False,

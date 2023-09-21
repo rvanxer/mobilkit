@@ -175,7 +175,7 @@ class Spark:
         df = self.context.emptyRDD()
         return self.session.createDataFrame(df, schema=schema)
 
-    def read_csv(self, paths, schema=None, header=False):
+    def read_csv(self, paths, schema=None, header=False, **kwargs):
         """
         Read CSV files and container folders as pyspark dataframes.
 
@@ -195,12 +195,13 @@ class Spark:
         """
         if isinstance(paths, str) or isinstance(paths, Path):
             paths = [paths]
-        df = (self.session.read.option('header', header)
-              .csv(str(paths.pop(0)), schema))
+        reader = self.session.read.option('header', header)
+        for k, v in kwargs.items():
+            reader = reader.option(k, v)
+        df = reader.csv(str(paths.pop(0)), schema)
         schema_ = df.schema
         for path in paths:
-            df = df.union((self.session.read.option('header', header)
-                           .csv(str(path), schema_)))
+            df = df.union((reader.csv(str(path), schema_)))
         return df
 
     def read_parquet(self, paths):

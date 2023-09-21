@@ -47,6 +47,7 @@ MK = UMNI / 'users/verma99/mk'
 # Python interpreter for UMNI projects
 MK_PYTHON = UMNI / 'users/verma99/anaconda3/envs/mk3.9/bin/python'
 
+CAT = 'category'
 # Pyspark session handler
 # configuration depends on the host server of the script
 SERVER = os.uname().nodename.split('.')[0]
