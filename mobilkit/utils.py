@@ -11,14 +11,15 @@ import re
 import warnings
 
 import geopandas as gpd
-import IPython
+from IPython.display import display, HTML
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pyspark
-import seaborn as sns
 import yaml
+
+D = dict
 
 # Unit conversion factors
 M2FT = 3.28084 # meter to feet
@@ -29,12 +30,15 @@ MI2KM = 1.60934  # mile to kilometer
 KM2MI = 1 / 1.60934  # kilometer to mile
 SQMI2SQM = 2.58998811e6  # sq. mile to sq. meter
 SQM2SQMI = 1 / 2.58998811e6  # sq. meter to sq. mile
+MPH2MPS = 0.44704 # miles per hr to meters per second
+MPS2MPH = 1 / MPH2MPS
 
 # matplotlib custom plotting parameters
 MPL_RCPARAMS = {
     'axes.edgecolor': 'k',
     'axes.edgecolor': 'k',
     'axes.formatter.use_mathtext': True,
+    'axes.grid': True,
     'axes.labelcolor': 'k',
     'axes.labelsize': 13,
     'axes.linewidth': 0.5,
@@ -360,9 +364,8 @@ def disp(x, top=1, mem=True, vert=False):
         if tabular:
             types = {x.index.name or '': '<' + x.dtypes.astype(str) + '>'}
             types = pd.DataFrame(types).T
-            df = pd.concat([types, x.head(top).astype({'geometry': str}) if
-                           crs else x.head(top)])
-            IPython.display.display(df)
+            display(pd.concat([types, x.head(top).astype({'geometry': str}) 
+                               if crs else x.head(top)]))
         else:
             print(x.head(top))
 
@@ -385,7 +388,6 @@ def disp(x, top=1, mem=True, vert=False):
 # noinspection PyDefaultArgument
 def config_display(
         disp_method=False,
-        sns_style='whitegrid',
         pd_options=(('display.max_columns', 100),),
         mpl_options=MPL_RCPARAMS):
     """
@@ -407,7 +409,7 @@ def config_display(
     -------
     None
     """
-    sns.set_style(sns_style)
+    # sns.set_style(sns_style)
     for opt in pd_options:
         pd.set_option(*opt)
     # mpl.rcParams.update(mpl_options)
@@ -528,3 +530,63 @@ def plot(ax=None, fig=None, size=None, dpi=None, title=None, xlab=None,
     auto_title = 'Untitled-' + dt.datetime.now().isoformat().replace(':', '-')
     if save: imsave(title or auto_title, root=mkdir(path), fig=fig)
     return ax
+
+
+def plot_func_value_line(ax, x, y, horz=True, vert=True,
+                         color='.5', ls='--', lw=1, **kwargs):
+    """
+    Plot a vertical and horizontal line for a point from the 
+    axis lines; commonly used to highlight function values.
+
+    Parameters
+    ----------
+    ax : plt.Axes
+    x, y : float (depends on the axes type)
+        Coordinates of the target point (in the axes coordinates).
+    horz, vert : bool
+        Whether draw horizontal line or vertical line.
+    kwargs : dict
+        Other keyword arguments for line plots.
+
+    Returns
+    -------
+    ax : plt.Axes
+    """
+    kw = dict(color=color, ls=ls, lw=lw) | kwargs
+    xmin, ymin = ax.get_xlim()[0], ax.get_ylim()[0]
+    if horz:
+        ax.plot([xmin, x], [y]*2, **kw)
+        ax.set_xlim(xmin)
+    if vert:
+        ax.plot([x]*2, [ymin, y], **kw)
+        ax.set_ylim(ymin)
+    return ax
+
+
+def plot_panel_labels(fig=None, x=-0.02, y=1.02, lowercase=True, **kwargs):
+    """
+    Plot the alphabetical labels of panels (subplots) in a given figure;
+    commonly used for paper-quality figures.
+
+    Parameters
+    ----------
+    fig : plt.Figure
+    x, y : float
+        Coordinates of the label (in normalized units).
+    lowercase : bool
+        Whether convert the label to lowercase (e.g., in Nature journals)
+    """
+    kw = dict(size=15, weight='bold', ha='right', va='bottom') | kwargs
+    fig = fig or plt.gcf()
+    for i, ax in enumerate(fig.axes):
+        label = f"({chr(ord('@') + i + 1)})"
+        if lowercase: label = label.lower()
+        ax.text(x, y, label, transform=ax.transAxes, **kw)
+
+
+def disp_table(df: pd.DataFrame, styles=()):
+    """
+    Fancy display a Pandas dataframe with custom styles.
+    """
+    display(HTML(df.style.set_table_styles(styles)
+                 .to_html().replace('\\n', '<br>')))

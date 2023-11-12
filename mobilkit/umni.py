@@ -3,7 +3,7 @@ import datetime as dt
 from functools import reduce
 from glob import glob
 import itertools as it
-import os
+import os, sys
 from pathlib import Path
 
 # Commonly used external imports
@@ -30,10 +30,11 @@ from mobilkit.spark import Spark
 from mobilkit.geo import CRS_DEG, CRS_M
 from mobilkit.gps import UID, LON, LAT, TS, ERR
 
-# Display settings
+# Display and other settings
 U.config_display(disp_method=True)
 plt.rcParams.update(U.MPL_RCPARAMS)
-mpl.rcParams.update(U.MPL_RCPARAMS)
+# mpl.rcParams.update(U.MPL_RCPARAMS)
+gpd.options.io_engine = 'pyogrio'
 
 # Important paths
 # common root directory of TNET-1, UMNI-2 & UMNI-5
@@ -44,15 +45,15 @@ QUADRANT = UMNI / 'data/quadrant'
 SAFEGRAPH = UMNI / 'data/safegraph'
 # root directory for all projects
 MK = UMNI / 'users/verma99/mk'
-# Python interpreter for UMNI projects
-MK_PYTHON = UMNI / 'users/verma99/anaconda3/envs/mk3.9/bin/python'
 
 CAT = 'category'
+D = dict
 # Pyspark session handler
 # configuration depends on the host server of the script
 SERVER = os.uname().nodename.split('.')[0]
 # set the handler
-os.environ['PYSPARK_PYTHON'] = str(MK_PYTHON)
+os.environ['PYSPARK_PYTHON'] = sys.executable
+os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable
 # Pyspark session handler with resources allocated 
 # according to the host server
 SP = Spark({k: v.get(SERVER, None) for k, v in {

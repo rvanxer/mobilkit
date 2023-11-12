@@ -49,8 +49,7 @@ TABLE_TYPES = pd.DataFrame([  # columns: (type id, label, description)
 ], columns=('id', 'label', 'info'))
 
 # Census table subjects, obtained from
-# https://www.census.gov/programs-surveys/acs/data/data-tables/table-ids
-# -explained.html
+# https://www.census.gov/acs/www/data/data-tables-and-tools/subject-tables
 SUBJECTS = { # subject_id: subject_label
     '01': 'Age; Sex',
     '02': 'Race',
@@ -379,7 +378,7 @@ def download(geo, fields, src='acs5', year=2020, table_type='detail', key=None):
         try:
             data = resp.json()
             df = pd.DataFrame(data[1:], columns=data[0])
-            id_cols = list(set(df.columns) - set(cols))
+            id_cols = [x for x in df.columns if x not in cols]
             res = pd.concat([res, df.set_index(id_cols)], axis=1)
         except Exception as e:
             print('Failed fetching', cols)
